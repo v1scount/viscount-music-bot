@@ -9,9 +9,9 @@ services:
       SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET}
     volumes:
       - ./lavalink/application.yml:/opt/Lavalink/application.yml:ro
-      # Bind mount so we can chown for the container user (uid 322).
-      # A Docker named volume is root-owned and breaks plugin downloads.
-      - ./lavalink/plugins:/opt/Lavalink/plugins
+      # Named volume inherits image ownership (uid 322). A host bind mount
+      # created by `sudo docker compose` is root-owned and breaks plugin downloads.
+      - lavalink-plugins:/opt/Lavalink/plugins
     networks:
       - music-bot
     # Published for local/WSL bots running on the host (npm start)
@@ -34,6 +34,9 @@ services:
       DEBUG: ${DEBUG:-false}
     networks:
       - music-bot
+
+volumes:
+  lavalink-plugins:
 
 networks:
   music-bot:
