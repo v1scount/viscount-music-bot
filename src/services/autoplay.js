@@ -1,31 +1,51 @@
-import { config } from "../config.js";
 import { debug, logError } from "../utils/logger.js";
 import { getPlayerState, trackKeys } from "../utils/playerState.js";
-import { getSimilarTracks } from "./lastFm.js";
 
 function isRecent(state, track) {
   return trackKeys(track).some((key) => state.recentTrackKeys.includes(key));
 }
 
-function rotateCandidates(candidates, random = Math.random) {
-  if (candidates.length < 2) return candidates;
-  const topRange = Math.min(5, candidates.length);
-  const offset = Math.floor(random() * topRange);
-  return [...candidates.slice(offset), ...candidates.slice(0, offset)];
+export function buildYoutubeMixUrl(identifier) {
+  return `https://www.youtube.com/watch?v=${identifier}&list=RD${identifier}`;
 }
 
-async function resolveCandidate(client, player, state, candidate) {
+async function resolveYoutubeSeed(client, seed) {
+  const source = seed.info.sourceName?.toLowerCase();
+  const uri = seed.info.uri ?? "";
+  if (
+    seed.info.identifier &&
+    (source === "youtube" || /(?:youtube\.com|youtu\.be)/i.test(uri))
+  ) {
+    return seed;
+  }
+
   const result = await client.poru.resolve({
-    query: `${candidate.artist} - ${candidate.title}`,
+    query: `${seed.info.author} - ${seed.info.title}`,
     source: "ytmsearch",
     requester: "Autoplay",
   });
 
   if (["error", "empty"].includes(result.loadType)) return null;
-  return (result.tracks ?? []).find((track) => !isRecent(state, track)) ?? null;
+  return result.tracks?.[0] ?? null;
 }
 
-async function resolveFallback(client, player, state, seed) {
+async function resolveMix(client, state, youtubeSeed, random = Math.random) {
+  const result = await client.poru.resolve({
+    query: buildYoutubeMixUrl(youtubeSeed.info.identifier),
+    requester: "Autoplay",
+  });
+
+  if (["error", "empty"].includes(result.loadType)) return null;
+  const candidates = (result.tracks ?? []).filter(
+    (track) =>
+      track.info.identifier !== youtubeSeed.info.identifier &&
+      !isRecent(state, track),
+  );
+  if (candidates.length === 0) return null;
+  return candidates[Math.floor(random() * candidates.length)];
+}
+
+async function resolveFallback(client, state, seed) {
   const result = await client.poru.resolve({
     query: `${seed.info.author} radio similar songs`,
     source: "ytmsearch",
@@ -41,25 +61,20 @@ export async function findAutoplayTrack(client, player, state, random = Math.ran
   if (!seed) return null;
 
   try {
-    const candidates = await getSimilarTracks({
-      apiKey: config.lastfm.apiKey,
-      artist: seed.info.author,
-      title: seed.info.title,
-    });
-
-    for (const candidate of rotateCandidates(candidates, random)) {
-      const track = await resolveCandidate(client, player, state, candidate);
+    const youtubeSeed = await resolveYoutubeSeed(client, seed);
+    if (youtubeSeed) {
+      const track = await resolveMix(client, state, youtubeSeed, random);
       if (track) return track;
     }
   } catch (error) {
-    logError("autoplay:lastfm", error, {
+    logError("autoplay:youtube-mix", error, {
       title: seed.info.title,
       artist: seed.info.author,
     });
   }
 
-  debug("autoplay", "Using YouTube Music fallback");
-  return resolveFallback(client, player, state, seed);
+  debug("autoplay", "Using YouTube Music search fallback");
+  return resolveFallback(client, state, seed);
 }
 
 export async function startAutoplay(client, player) {

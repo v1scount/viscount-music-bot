@@ -1,6 +1,6 @@
 # music-bot
 
-Private Discord music bot using Lavalink v4 (with LavaSrc), Poru, and Last.fm recommendations.
+Private Discord music bot using Lavalink v4 (with LavaSrc), Poru, and YouTube Mix recommendations.
 
 The bot provides an interactive now-playing panel, editable queue, audio filters, and similar-track autoplay when the manual queue ends.
 
@@ -11,8 +11,7 @@ The bot provides an interactive now-playing panel, editable queue, audio filters
 
 ## Setup
 
-1. Copy `.env.example` to `.env` and fill in your Discord, Spotify, and Last.fm credentials.
-   Create a Last.fm API key at <https://www.last.fm/api/account/create> for similar-track autoplay.
+1. Copy `.env.example` to `.env` and fill in your Discord and Spotify credentials.
 2. Start Lavalink:
 
 ```bash
@@ -63,7 +62,7 @@ sudo mkdir -p lavalink/plugins && sudo chown -R 322:322 lavalink/plugins
 | `/remove position` | Remove an upcoming track |
 | `/move from to` | Reorder an upcoming track |
 | `/clear` | Clear upcoming tracks without stopping |
-| `/autoplay enabled` | Toggle Last.fm similar-track autoplay |
+| `/autoplay enabled` | Toggle YouTube Mix autoplay |
 | `/filter preset` | Apply bass boost, nightcore, karaoke, or reset |
 
 ## Player panel
@@ -72,7 +71,7 @@ The bot keeps one now-playing message per server and updates it as playback chan
 
 ## Autoplay
 
-Autoplay is enabled by default. When the manual queue ends, the bot asks Last.fm for tracks similar to the last song and resolves a playable version through YouTube Music. Recently played tracks are excluded. Manually queued tracks always take priority, and YouTube Music search is used as a fallback if Last.fm is unavailable.
+Autoplay is enabled by default. When the manual queue ends, the bot builds a YouTube Mix from the last song and chooses a related track. If the original song came from Spotify, SoundCloud, or another source, the bot first finds its YouTube Music equivalent. Recently played tracks are excluded, manually queued tracks always take priority, and a YouTube Music search is used if the Mix is unavailable.
 
 Use `/autoplay enabled:false` or the panel button to disable it for a server.
 

@@ -21,7 +21,4 @@ export const config = {
     password: required("LAVALINK_PASSWORD"),
     secure: false,
   },
-  lastfm: {
-    apiKey: process.env.LASTFM_API_KEY || null,
-  },
 };
