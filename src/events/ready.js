@@ -61,6 +61,13 @@ export async function execute(readyClient, client) {
     `Logged in as ${readyClient.user.tag} | Lavalink ${config.lavalink.host}:${config.lavalink.port} | guilds=${client.guilds.cache.size}`,
   );
 
+  if (!config.lastfm.apiKey) {
+    log(
+      "ready",
+      "LASTFM_API_KEY is missing; autoplay will use the YouTube Music fallback.",
+    );
+  }
+
   if (client.guilds.cache.size === 0) {
     const invite = `https://discord.com/oauth2/authorize?client_id=${config.discord.clientId}&permissions=3145728&integration_type=0&scope=bot%20applications.commands`;
     log("ready", `No guilds in cache. Invite with bot scope: ${invite}`);

@@ -1,5 +1,6 @@
 import { MessageFlags, SlashCommandBuilder } from "discord.js";
 import { getPlayer, requireVoiceChannel } from "../utils/voice.js";
+import { updatePlayerPanel } from "../utils/playerPanel.js";
 
 export const data = new SlashCommandBuilder()
   .setName("stop")
@@ -23,7 +24,8 @@ export async function execute(interaction, client) {
   }
 
   player.queue.clear();
-  player.destroy();
+  await updatePlayerPanel(client, player, { disabled: true });
+  await player.destroy();
 
   return interaction.reply("Stopped playback and left the voice channel.");
 }

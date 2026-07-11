@@ -1,5 +1,6 @@
 import { MessageFlags, SlashCommandBuilder } from "discord.js";
 import { getPlayer, requireVoiceChannel } from "../utils/voice.js";
+import { updatePlayerPanel } from "../utils/playerPanel.js";
 
 export const data = new SlashCommandBuilder()
   .setName("pause")
@@ -30,6 +31,7 @@ export async function execute(interaction, client) {
   }
 
   await player.pause(true);
+  await updatePlayerPanel(client, player);
 
   return interaction.reply(
     `Paused **${player.currentTrack.info.title}**. Use \`/resume\` to continue.`,

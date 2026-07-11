@@ -1,10 +1,15 @@
 import { Events, MessageFlags } from "discord.js";
 import { debug, formatUserError, log, logError } from "../utils/logger.js";
+import { handleMusicComponent } from "../utils/playerComponents.js";
 
 export const name = Events.InteractionCreate;
 export const once = false;
 
 export async function execute(interaction, client) {
+  if (interaction.isButton() || interaction.isStringSelectMenu()) {
+    if (await handleMusicComponent(interaction, client)) return;
+  }
+
   // Log every interaction type so we can see if Discord is delivering autocomplete.
   if (interaction.isAutocomplete() || interaction.isChatInputCommand()) {
     log(

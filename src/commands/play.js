@@ -1,5 +1,6 @@
 import { MessageFlags, SlashCommandBuilder } from "discord.js";
 import { debug, log, logError } from "../utils/logger.js";
+import { updatePlayerPanel } from "../utils/playerPanel.js";
 import { formatDuration, requireVoiceChannel } from "../utils/voice.js";
 import {
   assertCanJoinVoice,
@@ -305,6 +306,8 @@ export async function execute(interaction, client) {
       await player.play();
     }
 
+    await updatePlayerPanel(client, player);
+
     if (isRadioMix) {
       const track = tracks[0];
       return interaction.editReply(
@@ -328,6 +331,8 @@ export async function execute(interaction, client) {
   if (shouldStart) {
     await player.play();
   }
+
+  await updatePlayerPanel(client, player);
 
   return interaction.editReply(
     shouldStart

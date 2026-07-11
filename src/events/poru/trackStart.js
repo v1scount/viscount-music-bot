@@ -1,9 +1,14 @@
 import { debug } from "../../utils/logger.js";
-import { sendPlayerMessage } from "../../utils/playerMessage.js";
+import { updatePlayerPanel } from "../../utils/playerPanel.js";
+import { getPlayerState, rememberTrack } from "../../utils/playerState.js";
 
 export const name = "trackStart";
 
 export async function execute(player, track, client) {
+  const state = getPlayerState(client, player.guildId);
+  state.lastTrack = track;
+  rememberTrack(state, track);
+
   debug("trackStart", {
     title: track?.info?.title ?? null,
     author: track?.info?.author ?? null,
@@ -11,9 +16,5 @@ export async function execute(player, track, client) {
     queueLength: player?.queue?.length ?? 0,
   });
 
-  await sendPlayerMessage(
-    client,
-    player.textChannel,
-    `Now playing **${track.info.title}** by ${track.info.author}`,
-  );
+  await updatePlayerPanel(client, player);
 }
