@@ -1,16 +1,27 @@
 services:
+  # Empty named volumes are created as root; Lavalink runs as uid 322 and
+  # cannot download plugins until the mount is writable by that user.
+  lavalink-plugins-init:
+    image: alpine:3.20
+    user: "0:0"
+    volumes:
+      - lavalink-plugins:/plugins
+    command: ["chown", "-R", "322:322", "/plugins"]
+    restart: "no"
+
   lavalink:
     image: ghcr.io/lavalink-devs/lavalink:4
     container_name: music-bot-lavalink
     restart: unless-stopped
+    depends_on:
+      lavalink-plugins-init:
+        condition: service_completed_successfully
     environment:
       LAVALINK_PASSWORD: ${LAVALINK_PASSWORD}
       SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID}
       SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET}
     volumes:
       - ./lavalink/application.yml:/opt/Lavalink/application.yml:ro
-      # Named volume inherits image ownership (uid 322). A host bind mount
-      # created by `sudo docker compose` is root-owned and breaks plugin downloads.
       - lavalink-plugins:/opt/Lavalink/plugins
     networks:
       - music-bot

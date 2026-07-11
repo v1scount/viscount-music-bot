@@ -37,7 +37,7 @@ docker compose up -d
 
 For local/`npm start` use `LAVALINK_HOST=127.0.0.1`. Inside Compose, the bot uses the `lavalink` service name automatically.
 
-If Lavalink exits with `Permission denied` under `./plugins/`, the plugins volume is not writable by the container user (uid 322). With the default Compose setup this should not happen; if you bind-mount a host directory instead, fix it with:
+Compose includes a one-shot `lavalink-plugins-init` service that `chown`s the plugins volume to uid `322` (Lavalink’s user). Empty named volumes are created as root and otherwise cause `Permission denied` when downloading plugins. If you bind-mount a host directory instead, fix ownership with:
 
 ```bash
 sudo mkdir -p lavalink/plugins && sudo chown -R 322:322 lavalink/plugins
