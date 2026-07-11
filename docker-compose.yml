@@ -1,0 +1,40 @@
+services:
+  lavalink:
+    image: ghcr.io/lavalink-devs/lavalink:4
+    container_name: music-bot-lavalink
+    restart: unless-stopped
+    environment:
+      LAVALINK_PASSWORD: ${LAVALINK_PASSWORD}
+      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID}
+      SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET}
+    volumes:
+      - ./lavalink/application.yml:/opt/Lavalink/application.yml:ro
+      # Bind mount so we can chown for the container user (uid 322).
+      # A Docker named volume is root-owned and breaks plugin downloads.
+      - ./lavalink/plugins:/opt/Lavalink/plugins
+    networks:
+      - music-bot
+    # Published for local/WSL bots running on the host (npm start)
+    ports:
+      - "2333:2333"
+
+  bot:
+    build: .
+    container_name: music-bot
+    restart: unless-stopped
+    depends_on:
+      - lavalink
+    environment:
+      DISCORD_TOKEN: ${DISCORD_TOKEN}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
+      LAVALINK_HOST: lavalink
+      LAVALINK_PORT: 2333
+      LAVALINK_PASSWORD: ${LAVALINK_PASSWORD}
+      DEBUG: ${DEBUG:-false}
+    networks:
+      - music-bot
+
+networks:
+  music-bot:
+    driver: bridge

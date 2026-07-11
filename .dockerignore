@@ -1,0 +1,7 @@
+node_modules
+.git
+.env
+*.md
+lavalink/plugins
+lavalink/logs
+.DS_Store
