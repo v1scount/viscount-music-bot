@@ -1,5 +1,4 @@
 import { MessageFlags } from "discord.js";
-import { applyFilter } from "./filters.js";
 import { logError } from "./logger.js";
 import {
   PLAYER_COMPONENT_PREFIX,
@@ -23,17 +22,22 @@ async function handlePlayerComponent(interaction, client, player) {
   const action = interaction.customId.slice(PLAYER_COMPONENT_PREFIX.length);
   await interaction.deferUpdate();
 
-  if (interaction.isStringSelectMenu() && action === "filter") {
-    state.filter = await applyFilter(player, interaction.values[0]);
-  } else if (action === "pause") {
+  if (action === "pause") {
+    state.stopped = false;
     await player.pause(!player.isPaused);
   } else if (action === "skip") {
+    state.stopped = false;
     await player.skip();
   } else if (action === "stop") {
-    player.queue.clear();
-    await updatePlayerPanel(client, player, { disabled: true });
-    await player.destroy();
-    return;
+    if (state.stopped) {
+      state.stopped = false;
+      await player.pause(false);
+    } else {
+      await player.pause(true);
+      await player.seekTo(0);
+      player.position = 0;
+      state.stopped = true;
+    }
   } else if (action === "loop") {
     const current = LOOP_SEQUENCE.indexOf(player.loop);
     player.setLoop(LOOP_SEQUENCE[(current + 1) % LOOP_SEQUENCE.length]);

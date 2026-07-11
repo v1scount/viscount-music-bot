@@ -306,7 +306,9 @@ export async function execute(interaction, client) {
       await player.play();
     }
 
-    await updatePlayerPanel(client, player);
+    if (!shouldStart) {
+      await updatePlayerPanel(client, player);
+    }
 
     if (isRadioMix) {
       const track = tracks[0];
@@ -332,7 +334,9 @@ export async function execute(interaction, client) {
     await player.play();
   }
 
-  await updatePlayerPanel(client, player);
+  if (!shouldStart) {
+    await updatePlayerPanel(client, player);
+  }
 
   return interaction.editReply(
     shouldStart

@@ -4,13 +4,14 @@ function createState() {
   return {
     autoplay: true,
     autoplayPending: false,
-    filter: "off",
     lastPanelUpdateAt: 0,
     lastTrack: null,
     panelChannelId: null,
     panelMessage: null,
     panelMessageId: null,
+    panelUpdatePromise: null,
     recentTrackKeys: [],
+    stopped: false,
   };
 }
 

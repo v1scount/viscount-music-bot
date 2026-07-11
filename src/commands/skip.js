@@ -1,6 +1,7 @@
 import { MessageFlags, SlashCommandBuilder } from "discord.js";
 import { debug } from "../utils/logger.js";
 import { getPlayer, requireVoiceChannel } from "../utils/voice.js";
+import { getPlayerState } from "../utils/playerState.js";
 
 export const data = new SlashCommandBuilder()
   .setName("skip")
@@ -38,6 +39,7 @@ export async function execute(interaction, client) {
   // Stop the current track. Poru’s TrackEnd (reason=stopped) then calls
   // play(), which shifts the next queued item — not related/radio tracks.
   await player.skip();
+  getPlayerState(client, interaction.guildId).stopped = false;
 
   if (next) {
     return interaction.reply(

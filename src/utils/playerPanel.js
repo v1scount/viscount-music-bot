@@ -3,15 +3,36 @@ import {
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
-  StringSelectMenuBuilder,
 } from "discord.js";
-import { FILTER_NAMES } from "./filters.js";
 import { logError } from "./logger.js";
 import { getPlayerState } from "./playerState.js";
 import { progressBar } from "./time.js";
 import { formatDuration } from "./voice.js";
 
 export const PLAYER_COMPONENT_PREFIX = "music:";
+
+function isPlayerPanelMessage(message, botUserId) {
+  if (message.author?.id !== botUserId) return false;
+  return message.components?.some((row) =>
+    row.components?.some((component) =>
+      component.customId?.startsWith(PLAYER_COMPONENT_PREFIX),
+    ),
+  );
+}
+
+async function cleanupOldPanels(channel, client, keepMessageId) {
+  const messages = await channel.messages
+    .fetch({ limit: 50 })
+    .catch(() => null);
+  if (!messages) return;
+
+  const duplicates = [...messages.values()].filter(
+    (message) =>
+      message.id !== keepMessageId &&
+      isPlayerPanelMessage(message, client.user?.id),
+  );
+  await Promise.allSettled(duplicates.map((message) => message.delete()));
+}
 
 function requesterLabel(requester) {
   if (!requester) return "Unknown";
@@ -25,6 +46,7 @@ export function buildPlayerPanel(player, state, { disabled = false } = {}) {
   const active = Boolean(player?.currentTrack) && !disabled;
   const position = active ? player.position ?? 0 : 0;
   const duration = track?.info?.length ?? 0;
+  const showPlay = disabled || (player?.isPaused && !state.stopped);
 
   const embed = new EmbedBuilder()
     .setColor(active ? 0x5865f2 : 0x747f8d)
@@ -63,11 +85,6 @@ export function buildPlayerPanel(player, state, { disabled = false } = {}) {
         inline: true,
       },
       {
-        name: "Filter",
-        value: FILTER_NAMES[state.filter] ?? "Off",
-        inline: true,
-      },
-      {
         name: "Requested by",
         value: requesterLabel(track?.info?.requester),
         inline: true,
@@ -83,10 +100,10 @@ export function buildPlayerPanel(player, state, { disabled = false } = {}) {
   const controls = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId(`${PLAYER_COMPONENT_PREFIX}pause`)
-      .setEmoji(player?.isPaused ? "▶️" : "⏸️")
-      .setLabel(player?.isPaused ? "Resume" : "Pause")
+      .setEmoji(showPlay ? "▶️" : "⏸️")
+      .setLabel(showPlay ? "Play" : "Pause")
       .setStyle(ButtonStyle.Primary)
-      .setDisabled(!active),
+      .setDisabled(!active || Boolean(state.stopped)),
     new ButtonBuilder()
       .setCustomId(`${PLAYER_COMPONENT_PREFIX}skip`)
       .setEmoji("⏭️")
@@ -95,9 +112,9 @@ export function buildPlayerPanel(player, state, { disabled = false } = {}) {
       .setDisabled(!active),
     new ButtonBuilder()
       .setCustomId(`${PLAYER_COMPONENT_PREFIX}stop`)
-      .setEmoji("⏹️")
-      .setLabel("Stop")
-      .setStyle(ButtonStyle.Danger)
+      .setEmoji(state.stopped ? "▶️" : "⏹️")
+      .setLabel(state.stopped ? "Play" : "Stop")
+      .setStyle(state.stopped ? ButtonStyle.Success : ButtonStyle.Danger)
       .setDisabled(!active),
     new ButtonBuilder()
       .setCustomId(`${PLAYER_COMPONENT_PREFIX}loop`)
@@ -113,56 +130,54 @@ export function buildPlayerPanel(player, state, { disabled = false } = {}) {
       .setDisabled(disabled),
   );
 
-  const filters = new ActionRowBuilder().addComponents(
-    new StringSelectMenuBuilder()
-      .setCustomId(`${PLAYER_COMPONENT_PREFIX}filter`)
-      .setPlaceholder("Choose an audio filter")
-      .setDisabled(!active)
-      .addOptions(
-        Object.entries(FILTER_NAMES).map(([value, label]) => ({
-          label,
-          value,
-          default: state.filter === value,
-        })),
-      ),
-  );
-
-  return { embeds: [embed], components: [controls, filters] };
+  return { embeds: [embed], components: [controls] };
 }
 
 export async function updatePlayerPanel(client, player, options = {}) {
   const state = getPlayerState(client, player.guildId);
-  const channelId = player.textChannel ?? state.panelChannelId;
-  if (!channelId) return null;
+  const previousUpdate = state.panelUpdatePromise ?? Promise.resolve();
+  const updatePromise = previousUpdate.catch(() => null).then(async () => {
+    const channelId = state.panelChannelId ?? player.textChannel;
+    if (!channelId) return null;
 
-  const channel =
-    client.channels.cache.get(channelId) ??
-    (await client.channels.fetch(channelId).catch(() => null));
-  if (!channel?.isTextBased() || channel.isDMBased()) return null;
+    const channel =
+      client.channels.cache.get(channelId) ??
+      (await client.channels.fetch(channelId).catch(() => null));
+    if (!channel?.isTextBased() || channel.isDMBased()) return null;
 
-  const payload = buildPlayerPanel(player, state, options);
-  let message =
-    state.panelMessage?.channelId === channelId ? state.panelMessage : null;
+    const payload = buildPlayerPanel(player, state, options);
+    let message =
+      state.panelMessage?.channelId === channelId ? state.panelMessage : null;
 
-  if (!message && state.panelMessageId && state.panelChannelId === channelId) {
-    message = await channel.messages
-      .fetch(state.panelMessageId)
-      .catch(() => null);
-  }
+    if (!message && state.panelMessageId && state.panelChannelId === channelId) {
+      message = await channel.messages
+        .fetch(state.panelMessageId)
+        .catch(() => null);
+    }
 
-  try {
     if (message) {
       await message.edit(payload);
     } else {
       message = await channel.send(payload);
       state.panelMessageId = message.id;
       state.panelChannelId = channelId;
+      await cleanupOldPanels(channel, client, message.id);
     }
     state.panelMessage = message;
     state.lastPanelUpdateAt = Date.now();
     return message;
+  });
+
+  state.panelUpdatePromise = updatePromise;
+
+  try {
+    return await updatePromise;
   } catch (error) {
-    logError("playerPanel", error, { guildId: player.guildId, channelId });
+    logError("playerPanel", error, { guildId: player.guildId });
     return null;
+  } finally {
+    if (state.panelUpdatePromise === updatePromise) {
+      state.panelUpdatePromise = null;
+    }
   }
 }

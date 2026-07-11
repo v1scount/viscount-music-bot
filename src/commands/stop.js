@@ -1,6 +1,7 @@
 import { MessageFlags, SlashCommandBuilder } from "discord.js";
 import { getPlayer, requireVoiceChannel } from "../utils/voice.js";
 import { updatePlayerPanel } from "../utils/playerPanel.js";
+import { getPlayerState } from "../utils/playerState.js";
 
 export const data = new SlashCommandBuilder()
   .setName("stop")
@@ -24,6 +25,7 @@ export async function execute(interaction, client) {
   }
 
   player.queue.clear();
+  getPlayerState(client, interaction.guildId).stopped = false;
   await updatePlayerPanel(client, player, { disabled: true });
   await player.destroy();
 

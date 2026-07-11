@@ -2,7 +2,7 @@
 
 Private Discord music bot using Lavalink v4 (with LavaSrc), Poru, and YouTube Mix recommendations.
 
-The bot provides an interactive now-playing panel, editable queue, audio filters, and similar-track autoplay when the manual queue ends.
+The bot provides an interactive now-playing panel, editable queue, and similar-track autoplay when the manual queue ends.
 
 ## Requirements
 
@@ -63,11 +63,10 @@ sudo mkdir -p lavalink/plugins && sudo chown -R 322:322 lavalink/plugins
 | `/move from to` | Reorder an upcoming track |
 | `/clear` | Clear upcoming tracks without stopping |
 | `/autoplay enabled` | Toggle YouTube Mix autoplay |
-| `/filter preset` | Apply bass boost, nightcore, karaoke, or reset |
 
 ## Player panel
 
-The bot keeps one now-playing message per server and updates it as playback changes. Its controls provide pause/resume, skip, stop, loop, autoplay, and audio filter selection. The progress display refreshes periodically while a track is active.
+The bot keeps one now-playing message per server and updates it as playback changes. Its controls provide play/pause, skip, stop/play, loop, and autoplay. The panel Stop button pauses at `0:00` and becomes Play; the `/stop` command still clears the queue and leaves voice. The progress display refreshes periodically while a track is active.
 
 ## Autoplay
 

@@ -41,7 +41,6 @@ test("autoplay button toggles the guild setting", async () => {
     guildId: "guild",
     deferred: false,
     replied: false,
-    isStringSelectMenu: () => false,
     async deferUpdate() {
       this.deferred = true;
     },
@@ -71,4 +70,38 @@ test("queue next button updates the requested page", async () => {
 
   assert.equal(await handleMusicComponent(interaction, client), true);
   assert.match(payload.embeds[0].toJSON().footer.text, /Page 2\/2/);
+});
+
+test("stop button pauses at the beginning and becomes resumable", async () => {
+  const calls = [];
+  const player = {
+    guildId: "guild",
+    textChannel: "channel",
+    queue: [],
+    currentTrack: createTrack(),
+    volume: 100,
+    loop: "NONE",
+    isPaused: false,
+    async pause(value) {
+      calls.push(["pause", value]);
+      this.isPaused = value;
+    },
+    async seekTo(value) {
+      calls.push(["seek", value]);
+    },
+  };
+  const client = createClient(player);
+  const interaction = {
+    customId: "music:stop",
+    guildId: "guild",
+    async deferUpdate() {},
+  };
+
+  await handleMusicComponent(interaction, client);
+
+  assert.deepEqual(calls, [
+    ["pause", true],
+    ["seek", 0],
+  ]);
+  assert.equal(getPlayerState(client, "guild").stopped, true);
 });

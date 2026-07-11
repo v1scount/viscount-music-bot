@@ -7,6 +7,7 @@ export const name = "trackStart";
 export async function execute(player, track, client) {
   const state = getPlayerState(client, player.guildId);
   state.lastTrack = track;
+  state.stopped = false;
   rememberTrack(state, track);
 
   debug("trackStart", {

@@ -6,7 +6,7 @@ export const name = Events.InteractionCreate;
 export const once = false;
 
 export async function execute(interaction, client) {
-  if (interaction.isButton() || interaction.isStringSelectMenu()) {
+  if (interaction.isButton()) {
     if (await handleMusicComponent(interaction, client)) return;
   }
 
