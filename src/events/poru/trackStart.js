@@ -1,13 +1,13 @@
 import { debug } from "../../utils/logger.js";
 import { updatePlayerPanel } from "../../utils/playerPanel.js";
 import { getPlayerState, rememberTrack } from "../../utils/playerState.js";
+import { refreshIdleTimer } from "../../services/idleLeave.js";
 
 export const name = "trackStart";
 
 export async function execute(player, track, client) {
   const state = getPlayerState(client, player.guildId);
   state.lastTrack = track;
-  state.stopped = false;
   rememberTrack(state, track);
 
   debug("trackStart", {
@@ -18,4 +18,5 @@ export async function execute(player, track, client) {
   });
 
   await updatePlayerPanel(client, player);
+  refreshIdleTimer(client, player);
 }

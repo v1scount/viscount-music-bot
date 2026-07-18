@@ -43,11 +43,16 @@ services:
       LAVALINK_PORT: 2333
       LAVALINK_PASSWORD: ${LAVALINK_PASSWORD}
       DEBUG: ${DEBUG:-false}
+      DATA_PATH: /app/data/sessions.json
+      IDLE_LEAVE_MS: ${IDLE_LEAVE_MS:-300000}
+    volumes:
+      - bot-data:/app/data
     networks:
       - music-bot
 
 volumes:
   lavalink-plugins:
+  bot-data:
 
 networks:
   music-bot:

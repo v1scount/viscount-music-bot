@@ -1,3 +1,4 @@
+import "./helpers/env.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -5,6 +6,7 @@ import {
   updatePlayerPanel,
 } from "../src/utils/playerPanel.js";
 import { buildQueueView } from "../src/utils/queueView.js";
+import { colors } from "../src/utils/theme.js";
 
 function createTrack(index = 1) {
   return {
@@ -15,6 +17,8 @@ function createTrack(index = 1) {
       uri: "https://example.com/track",
       requester: { id: "123" },
       isStream: false,
+      sourceName: "youtube",
+      artworkUrl: "https://example.com/art.jpg",
     },
   };
 }
@@ -36,11 +40,21 @@ test("player panel exposes playback controls", () => {
     lastTrack: null,
   });
   const json = payload.components.map((row) => row.toJSON());
+  const embed = payload.embeds[0].toJSON();
 
   assert.equal(payload.embeds.length, 1);
+  assert.equal(embed.color, colors.active);
+  assert.equal(embed.image?.url, "https://example.com/art.jpg");
+  assert.match(embed.description, /Up next/);
+  assert.match(embed.description, /Source · Youtube/);
   assert.equal(json.length, 1);
-  assert.equal(json[0].components.length, 5);
+  assert.equal(json[0].components.length, 4);
   assert.equal(json[0].components[0].label, "Pause");
+  assert.equal(json[0].components[2].label, "Stop");
+  assert.equal(
+    embed.fields.some((field) => field.name === "Queue"),
+    false,
+  );
 });
 
 test("player panel switches pause to play", () => {
@@ -56,24 +70,12 @@ test("player panel switches pause to play", () => {
   assert.equal(button.disabled, false);
 });
 
-test("stop button switches to an enabled play button", () => {
-  const payload = buildPlayerPanel(createPlayer(), {
-    autoplay: true,
-    lastTrack: null,
-    stopped: true,
-  });
-  const buttons = payload.components[0].toJSON().components;
-
-  assert.equal(buttons[0].disabled, true);
-  assert.equal(buttons[2].label, "Play");
-  assert.equal(buttons[2].disabled, false);
-});
-
 test("queue view paginates upcoming tracks", () => {
   const payload = buildQueueView(createPlayer(12), 1);
   const embed = payload.embeds[0].toJSON();
   const controls = payload.components[0].toJSON().components;
 
+  assert.equal(embed.color, colors.active);
   assert.match(embed.footer.text, /Page 2\/2/);
   assert.equal(controls[0].disabled, false);
   assert.equal(controls[1].disabled, true);

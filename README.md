@@ -18,12 +18,13 @@ The bot provides an interactive now-playing panel, editable queue, and similar-t
 docker compose up -d lavalink
 ```
 
-3. Install dependencies and register slash commands:
+3. Install dependencies:
 
 ```bash
 npm install
-npm run deploy-commands
 ```
+
+Slash commands are registered automatically when the bot becomes ready. You can still deploy them manually with `npm run deploy-commands`.
 
 4. Run the bot:
 
@@ -45,6 +46,14 @@ Compose includes a one-shot `lavalink-plugins-init` service that `chown`s the pl
 sudo mkdir -p lavalink/plugins && sudo chown -R 322:322 lavalink/plugins
 ```
 
+## Persistence & idle leave
+
+Player sessions are saved to a JSON file (`DATA_PATH`, default `./data/sessions.json` locally or `/app/data/sessions.json` in Docker). On shutdown the bot flushes the file; on startup it restores voice, queue, panel, and autoplay when possible.
+
+Compose mounts a `bot-data` volume at `/app/data` for that file.
+
+If the bot is alone in a voice channel for `IDLE_LEAVE_MS` (default `300000` / 5 minutes), it clears the queue and leaves.
+
 ## Commands
 
 | Command | Description |
@@ -54,11 +63,8 @@ sudo mkdir -p lavalink/plugins && sudo chown -R 322:322 lavalink/plugins
 | `/resume` | Resume playback |
 | `/skip` | Skip the current track |
 | `/queue` | Show the queue |
-| `/stop` | Stop playback and clear the queue |
-| `/volume level` | Set playback volume from 0 to 100 |
+| `/stop` | Stop playback, clear the queue, and leave voice |
 | `/seek position` | Jump to seconds, `mm:ss`, or `hh:mm:ss` |
-| `/loop mode` | Loop the current track, queue, or nothing |
-| `/shuffle` | Shuffle upcoming tracks |
 | `/remove position` | Remove an upcoming track |
 | `/move from to` | Reorder an upcoming track |
 | `/clear` | Clear upcoming tracks without stopping |
@@ -66,7 +72,9 @@ sudo mkdir -p lavalink/plugins && sudo chown -R 322:322 lavalink/plugins
 
 ## Player panel
 
-The bot keeps one now-playing message per server and updates it as playback changes. Its controls provide play/pause, skip, stop/play, loop, and autoplay. The panel Stop button pauses at `0:00` and becomes Play; the `/stop` command still clears the queue and leaves voice. The progress display refreshes periodically while a track is active.
+The bot keeps one now-playing message per server and updates it as playback changes. Controls: Pause/Play, Skip, Stop, and Autoplay.
+
+Panel **Stop** matches `/stop`: it clears the queue, ends the panel, and leaves the voice channel. Progress refreshes about every 5 seconds while playing (not while paused). Failed tracks are skipped automatically with a short channel notice.
 
 ## Autoplay
 

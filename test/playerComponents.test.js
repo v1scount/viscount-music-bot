@@ -1,3 +1,4 @@
+import "./helpers/env.js";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { handleMusicComponent } from "../src/utils/playerComponents.js";
@@ -72,22 +73,23 @@ test("queue next button updates the requested page", async () => {
   assert.match(payload.embeds[0].toJSON().footer.text, /Page 2\/2/);
 });
 
-test("stop button pauses at the beginning and becomes resumable", async () => {
+test("stop button clears the queue and destroys the player", async () => {
   const calls = [];
   const player = {
     guildId: "guild",
     textChannel: "channel",
-    queue: [],
+    queue: {
+      length: 1,
+      clear() {
+        calls.push("clear");
+        this.length = 0;
+      },
+    },
     currentTrack: createTrack(),
-    volume: 100,
     loop: "NONE",
     isPaused: false,
-    async pause(value) {
-      calls.push(["pause", value]);
-      this.isPaused = value;
-    },
-    async seekTo(value) {
-      calls.push(["seek", value]);
+    async destroy() {
+      calls.push("destroy");
     },
   };
   const client = createClient(player);
@@ -99,9 +101,5 @@ test("stop button pauses at the beginning and becomes resumable", async () => {
 
   await handleMusicComponent(interaction, client);
 
-  assert.deepEqual(calls, [
-    ["pause", true],
-    ["seek", 0],
-  ]);
-  assert.equal(getPlayerState(client, "guild").stopped, true);
+  assert.deepEqual(calls, ["clear", "destroy"]);
 });

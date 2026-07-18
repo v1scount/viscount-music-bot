@@ -11,7 +11,6 @@ function createState() {
     panelMessageId: null,
     panelUpdatePromise: null,
     recentTrackKeys: [],
-    stopped: false,
   };
 }
 

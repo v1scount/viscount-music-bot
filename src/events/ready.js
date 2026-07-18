@@ -1,11 +1,15 @@
 import { Events } from "discord.js";
 import { config } from "../config.js";
-import { debug, log } from "../utils/logger.js";
+import { deployCommandsSafe } from "../services/deployCommands.js";
+import { restoreSessions } from "../services/sessionStore.js";
+import { debug, log, logError } from "../utils/logger.js";
 
 export const name = Events.ClientReady;
 export const once = true;
 
 export async function execute(readyClient, client) {
+  await deployCommandsSafe();
+
   await client.poru.init(client);
 
   // Wrap Poru's Discord voice send so we can see if OP4 is actually emitted.
@@ -55,6 +59,12 @@ export async function execute(readyClient, client) {
       });
     }
   });
+
+  try {
+    await restoreSessions(client);
+  } catch (error) {
+    logError("ready:restoreSessions", error);
+  }
 
   log(
     "ready",

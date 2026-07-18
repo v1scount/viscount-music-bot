@@ -33,7 +33,7 @@ export class MusicBot extends Client {
       {
         library: "discord.js",
         defaultPlatform: "ytsearch",
-        autoResume: false,
+        autoResume: true,
       },
     );
   }

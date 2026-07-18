@@ -7,8 +7,7 @@ import {
 import { getPlayerState } from "./playerState.js";
 import { buildQueueView, QUEUE_COMPONENT_PREFIX } from "./queueView.js";
 import { getPlayer } from "./voice.js";
-
-const LOOP_SEQUENCE = ["NONE", "TRACK", "QUEUE"];
+import { stopPlayback } from "./playback.js";
 
 async function handleQueueComponent(interaction, player) {
   const [, action, rawPage] = interaction.customId.split(":");
@@ -23,24 +22,12 @@ async function handlePlayerComponent(interaction, client, player) {
   await interaction.deferUpdate();
 
   if (action === "pause") {
-    state.stopped = false;
     await player.pause(!player.isPaused);
   } else if (action === "skip") {
-    state.stopped = false;
     await player.skip();
   } else if (action === "stop") {
-    if (state.stopped) {
-      state.stopped = false;
-      await player.pause(false);
-    } else {
-      await player.pause(true);
-      await player.seekTo(0);
-      player.position = 0;
-      state.stopped = true;
-    }
-  } else if (action === "loop") {
-    const current = LOOP_SEQUENCE.indexOf(player.loop);
-    player.setLoop(LOOP_SEQUENCE[(current + 1) % LOOP_SEQUENCE.length]);
+    await stopPlayback(client, player);
+    return;
   } else if (action === "autoplay") {
     state.autoplay = !state.autoplay;
   }

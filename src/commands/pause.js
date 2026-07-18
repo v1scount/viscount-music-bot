@@ -1,7 +1,6 @@
 import { MessageFlags, SlashCommandBuilder } from "discord.js";
 import { getPlayer, requireVoiceChannel } from "../utils/voice.js";
 import { updatePlayerPanel } from "../utils/playerPanel.js";
-import { getPlayerState } from "../utils/playerState.js";
 
 export const data = new SlashCommandBuilder()
   .setName("pause")
@@ -32,7 +31,6 @@ export async function execute(interaction, client) {
   }
 
   await player.pause(true);
-  getPlayerState(client, interaction.guildId).stopped = false;
   await updatePlayerPanel(client, player);
 
   return interaction.reply(

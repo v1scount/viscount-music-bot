@@ -1,8 +1,8 @@
 import { startAutoplay } from "../../services/autoplay.js";
 import { debug, logError } from "../../utils/logger.js";
-import { updatePlayerPanel } from "../../utils/playerPanel.js";
 import { getPlayerState } from "../../utils/playerState.js";
 import { sendPlayerMessage } from "../../utils/playerMessage.js";
+import { stopPlayback } from "../../utils/playback.js";
 
 export const name = "queueEnd";
 
@@ -35,10 +35,8 @@ export async function execute(player, client) {
     "Queue ended — leaving the voice channel.",
   );
 
-  await updatePlayerPanel(client, player, { disabled: true });
-
   try {
-    await player.destroy();
+    await stopPlayback(client, player);
   } catch (error) {
     logError("queueEnd:destroy", error);
   }

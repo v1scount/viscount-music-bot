@@ -8,6 +8,7 @@ import { logError } from "./logger.js";
 import { getPlayerState } from "./playerState.js";
 import { progressBar } from "./time.js";
 import { formatDuration } from "./voice.js";
+import { colors } from "./theme.js";
 
 export const PLAYER_COMPONENT_PREFIX = "music:";
 
@@ -41,21 +42,38 @@ function requesterLabel(requester) {
   return requester.username ?? requester.tag ?? "Unknown";
 }
 
+function sourceLabel(track) {
+  const raw = track?.info?.sourceName;
+  if (!raw) return "Unknown";
+  return String(raw).charAt(0).toUpperCase() + String(raw).slice(1);
+}
+
 export function buildPlayerPanel(player, state, { disabled = false } = {}) {
   const track = player?.currentTrack ?? state.lastTrack;
   const active = Boolean(player?.currentTrack) && !disabled;
   const position = active ? player.position ?? 0 : 0;
   const duration = track?.info?.length ?? 0;
-  const showPlay = disabled || (player?.isPaused && !state.stopped);
+  const showPlay = Boolean(player?.isPaused);
+  const next = player?.queue?.[0];
+
+  const descriptionParts = [];
+  if (track) {
+    descriptionParts.push(
+      `**[${track.info.title}](${track.info.uri ?? "https://discord.com"})**`,
+      track.info.author,
+      `Source · ${sourceLabel(track)}`,
+    );
+  } else {
+    descriptionParts.push("Nothing is playing.");
+  }
+  if (next) {
+    descriptionParts.push("", `Up next · **${next.info.title}** — ${next.info.author}`);
+  }
 
   const embed = new EmbedBuilder()
-    .setColor(active ? 0x5865f2 : 0x747f8d)
+    .setColor(active ? colors.active : colors.ended)
     .setTitle(active ? "Now Playing" : "Playback Ended")
-    .setDescription(
-      track
-        ? `**[${track.info.title}](${track.info.uri ?? "https://discord.com"})**\n${track.info.author}`
-        : "Nothing is playing.",
-    )
+    .setDescription(descriptionParts.join("\n"))
     .addFields(
       {
         name: "Progress",
@@ -63,21 +81,6 @@ export function buildPlayerPanel(player, state, { disabled = false } = {}) {
           ? "Live stream"
           : `${progressBar(position, duration)}\n\`${formatDuration(position)} / ${formatDuration(duration)}\``,
         inline: false,
-      },
-      {
-        name: "Queue",
-        value: `${player?.queue?.length ?? 0} track(s)`,
-        inline: true,
-      },
-      {
-        name: "Volume",
-        value: `${player?.volume ?? 100}%`,
-        inline: true,
-      },
-      {
-        name: "Loop",
-        value: player?.loop ?? "NONE",
-        inline: true,
       },
       {
         name: "Autoplay",
@@ -94,7 +97,7 @@ export function buildPlayerPanel(player, state, { disabled = false } = {}) {
     .setTimestamp();
 
   if (track?.info?.artworkUrl) {
-    embed.setThumbnail(track.info.artworkUrl);
+    embed.setImage(track.info.artworkUrl);
   }
 
   const controls = new ActionRowBuilder().addComponents(
@@ -103,7 +106,7 @@ export function buildPlayerPanel(player, state, { disabled = false } = {}) {
       .setEmoji(showPlay ? "▶️" : "⏸️")
       .setLabel(showPlay ? "Play" : "Pause")
       .setStyle(ButtonStyle.Primary)
-      .setDisabled(!active || Boolean(state.stopped)),
+      .setDisabled(!active),
     new ButtonBuilder()
       .setCustomId(`${PLAYER_COMPONENT_PREFIX}skip`)
       .setEmoji("⏭️")
@@ -112,15 +115,9 @@ export function buildPlayerPanel(player, state, { disabled = false } = {}) {
       .setDisabled(!active),
     new ButtonBuilder()
       .setCustomId(`${PLAYER_COMPONENT_PREFIX}stop`)
-      .setEmoji(state.stopped ? "▶️" : "⏹️")
-      .setLabel(state.stopped ? "Play" : "Stop")
-      .setStyle(state.stopped ? ButtonStyle.Success : ButtonStyle.Danger)
-      .setDisabled(!active),
-    new ButtonBuilder()
-      .setCustomId(`${PLAYER_COMPONENT_PREFIX}loop`)
-      .setEmoji("🔁")
-      .setLabel(`Loop: ${player?.loop ?? "NONE"}`)
-      .setStyle(ButtonStyle.Secondary)
+      .setEmoji("⏹️")
+      .setLabel("Stop")
+      .setStyle(ButtonStyle.Danger)
       .setDisabled(!active),
     new ButtonBuilder()
       .setCustomId(`${PLAYER_COMPONENT_PREFIX}autoplay`)
@@ -178,6 +175,11 @@ export async function updatePlayerPanel(client, player, options = {}) {
   } finally {
     if (state.panelUpdatePromise === updatePromise) {
       state.panelUpdatePromise = null;
+    }
+    if (!options.disabled) {
+      import("../services/sessionStore.js")
+        .then(({ scheduleSave }) => scheduleSave(client))
+        .catch(() => null);
     }
   }
 }

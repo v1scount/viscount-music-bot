@@ -1,4 +1,5 @@
 import "dotenv/config";
+import path from "node:path";
 
 function required(name) {
   const value = process.env[name];
@@ -21,4 +22,9 @@ export const config = {
     password: required("LAVALINK_PASSWORD"),
     secure: false,
   },
+  /** Persisted player sessions (JSON file). Docker sets DATA_PATH=/app/data/sessions.json. */
+  dataPath:
+    process.env.DATA_PATH || path.join(process.cwd(), "data", "sessions.json"),
+  /** Leave voice when alone for this long (default 5 minutes). */
+  idleLeaveMs: Number(process.env.IDLE_LEAVE_MS || 300_000),
 };

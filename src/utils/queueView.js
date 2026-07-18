@@ -5,6 +5,7 @@ import {
   EmbedBuilder,
 } from "discord.js";
 import { formatDuration } from "./voice.js";
+import { colors } from "./theme.js";
 
 export const QUEUE_COMPONENT_PREFIX = "music_queue:";
 const PAGE_SIZE = 10;
@@ -36,7 +37,7 @@ export function buildQueueView(player, requestedPage = 0) {
     : "No upcoming tracks.";
 
   const embed = new EmbedBuilder()
-    .setColor(0x5865f2)
+    .setColor(colors.active)
     .setTitle("Music Queue")
     .setDescription(description)
     .addFields({

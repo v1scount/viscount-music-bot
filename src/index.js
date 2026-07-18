@@ -3,9 +3,14 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { MusicBot } from "./client.js";
 import { config } from "./config.js";
+import { clearAllIdleTimers } from "./services/idleLeave.js";
+import { flushSave } from "./services/sessionStore.js";
+import { log, logError } from "./utils/logger.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const client = new MusicBot();
+
+let shuttingDown = false;
 
 async function loadCommands() {
   const commandsDir = path.join(__dirname, "commands");
@@ -66,6 +71,36 @@ async function loadPoruEvents() {
   console.log(`[poru] Loaded ${files.length} Poru event(s)`);
 }
 
+async function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  log("shutdown", `Received ${signal} — flushing sessions`);
+
+  clearAllIdleTimers();
+
+  try {
+    await flushSave(client);
+  } catch (error) {
+    logError("shutdown:flush", error);
+  }
+
+  for (const player of [...client.poru.players.values()]) {
+    try {
+      await player.destroy();
+    } catch (error) {
+      logError("shutdown:destroy", error, { guildId: player.guildId });
+    }
+  }
+
+  try {
+    client.destroy();
+  } catch (error) {
+    logError("shutdown:client", error);
+  }
+
+  process.exit(0);
+}
+
 async function main() {
   await loadCommands();
   await loadEvents();
@@ -73,6 +108,13 @@ async function main() {
 
   process.on("unhandledRejection", (error) => {
     console.error("[unhandledRejection]", error);
+  });
+
+  process.on("SIGTERM", () => {
+    void shutdown("SIGTERM");
+  });
+  process.on("SIGINT", () => {
+    void shutdown("SIGINT");
   });
 
   await client.login(config.discord.token);

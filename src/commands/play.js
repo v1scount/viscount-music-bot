@@ -1,12 +1,58 @@
 import { MessageFlags, SlashCommandBuilder } from "discord.js";
+import { Track } from "poru";
 import { debug, log, logError } from "../utils/logger.js";
 import { updatePlayerPanel } from "../utils/playerPanel.js";
+import { resolveCache } from "../utils/resolveCache.js";
 import { formatDuration, requireVoiceChannel } from "../utils/voice.js";
 import {
   assertCanJoinVoice,
   ensurePlayer,
   waitForVoiceConnection,
 } from "../utils/voiceConnection.js";
+import { refreshIdleTimer } from "../services/idleLeave.js";
+
+/**
+ * @param {object} result
+ * @param {unknown} [requester]
+ */
+function cloneResolveResult(result, requester) {
+  if (!result?.tracks?.length) return result;
+  return {
+    ...result,
+    tracks: result.tracks.map(
+      (track) =>
+        new Track(
+          {
+            encoded: track.track,
+            info: { ...track.info },
+            pluginInfo: { ...(track.pluginInfo ?? {}) },
+            userData: { ...(track.userData ?? {}) },
+          },
+          requester ?? track.info?.requester,
+        ),
+    ),
+  };
+}
+
+/**
+ * @param {import("../client.js").MusicBot} client
+ * @param {{ query: string, source?: string, requester: unknown }} options
+ */
+async function resolveCached(client, options) {
+  const source = options.source ?? "url";
+  const cacheKey = resolveCache.key(source, options.query);
+  const cached = resolveCache.get(cacheKey);
+  if (cached) {
+    debug("resolveCache", `hit ${cacheKey}`);
+    return cloneResolveResult(cached, options.requester);
+  }
+
+  const result = await client.poru.resolve(options);
+  if (result.loadType !== "error") {
+    resolveCache.set(cacheKey, result);
+  }
+  return cloneResolveResult(result, options.requester);
+}
 
 export const data = new SlashCommandBuilder()
   .setName("play")
@@ -94,7 +140,7 @@ export async function autocomplete(interaction, client) {
 
   try {
     const result = await Promise.race([
-      client.poru.resolve({
+      resolveCached(client, {
         query,
         source: "ytsearch",
         requester: interaction.user,
@@ -251,7 +297,7 @@ export async function execute(interaction, client) {
     );
   }
 
-  const result = await client.poru.resolve({
+  const result = await resolveCached(client, {
     query,
     // Let LavaSrc handle Spotify URLs; use YouTube search for plain text.
     ...(isUrl ? {} : { source: "ytsearch" }),
@@ -309,6 +355,7 @@ export async function execute(interaction, client) {
     if (!shouldStart) {
       await updatePlayerPanel(client, player);
     }
+    refreshIdleTimer(client, player);
 
     if (isRadioMix) {
       const track = tracks[0];
@@ -337,6 +384,7 @@ export async function execute(interaction, client) {
   if (!shouldStart) {
     await updatePlayerPanel(client, player);
   }
+  refreshIdleTimer(client, player);
 
   return interaction.editReply(
     shouldStart
