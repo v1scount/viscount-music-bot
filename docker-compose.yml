@@ -6,7 +6,10 @@ services:
     user: "0:0"
     volumes:
       - lavalink-plugins:/plugins
-    command: ["chown", "-R", "322:322", "/plugins"]
+    command:
+      - sh
+      - -c
+      - rm -f /plugins/youtube-plugin-*.jar && chown -R 322:322 /plugins
     restart: "no"
 
   lavalink:
@@ -20,6 +23,7 @@ services:
       LAVALINK_PASSWORD: ${LAVALINK_PASSWORD}
       SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID}
       SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET}
+      YOUTUBE_OAUTH_REFRESH_TOKEN: ${YOUTUBE_OAUTH_REFRESH_TOKEN:-}
     volumes:
       - ./lavalink/application.yml:/opt/Lavalink/application.yml:ro
       - lavalink-plugins:/opt/Lavalink/plugins

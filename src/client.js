@@ -34,6 +34,8 @@ export class MusicBot extends Client {
         library: "discord.js",
         defaultPlatform: "ytsearch",
         autoResume: true,
+        reconnectTimeout: 3000,
+        reconnectTries: 50,
       },
     );
   }

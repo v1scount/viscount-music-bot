@@ -9,8 +9,8 @@ lavalink:
       repository: "https://maven.lavalink.dev/releases"
       snapshot: false
     # Required mirror backend for ytsearch providers (built-in YouTube source is deprecated)
-    - dependency: "dev.lavalink.youtube:youtube-plugin:1.18.1"
-      snapshot: false
+    - dependency: "dev.lavalink.youtube:youtube-plugin:f45bbb7aebfcbc1c553769e04af6cd43afa8b7c3"
+      snapshot: true
   server:
     password: "${LAVALINK_PASSWORD}"
     sources:
@@ -39,9 +39,17 @@ plugins:
     allowDirectPlaylistIds: true
     clients:
       - MUSIC
+      - TV
+      - TVHTML5_SIMPLY
       - ANDROID_VR
       - WEB
       - WEBEMBEDDED
+    oauth:
+      enabled: true
+      refreshToken: "${YOUTUBE_OAUTH_REFRESH_TOKEN:}"
+    remoteCipher:
+      url: "https://cipher.kikkia.dev/"
+      userAgent: "viscount-music-bot"
 
   lavasrc:
     providers:
@@ -84,3 +92,4 @@ logging:
   level:
     root: INFO
     lavalink: INFO
+    dev.lavalink.youtube.http.YoutubeOauth2Handler: INFO
