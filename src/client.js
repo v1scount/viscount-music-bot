@@ -12,6 +12,7 @@ export class MusicBot extends Client {
     super({
       intents: [
         GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
         GatewayIntentBits.GuildVoiceStates,
       ],
       partials: [Partials.Channel],

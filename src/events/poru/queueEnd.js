@@ -1,7 +1,6 @@
 import { startAutoplay } from "../../services/autoplay.js";
 import { debug, logError } from "../../utils/logger.js";
 import { getPlayerState } from "../../utils/playerState.js";
-import { sendPlayerMessage } from "../../utils/playerMessage.js";
 import { stopPlayback } from "../../utils/playback.js";
 
 export const name = "queueEnd";
@@ -28,12 +27,6 @@ export async function execute(player, client) {
       logError("queueEnd:autoplay", error, { guildId: player.guildId });
     }
   }
-
-  await sendPlayerMessage(
-    client,
-    player.textChannel,
-    "Queue ended — leaving the voice channel.",
-  );
 
   try {
     await stopPlayback(client, player);

@@ -9,8 +9,10 @@ function createState() {
     panelChannelId: null,
     panelMessage: null,
     panelMessageId: null,
+    panelRelocateTimer: null,
     panelUpdatePromise: null,
     recentTrackKeys: [],
+    stopping: false,
   };
 }
 
@@ -26,6 +28,22 @@ export function getPlayerState(client, guildId) {
   }
 
   return states.get(guildId);
+}
+
+/**
+ * Drop now-playing message refs after a session ends. Keeps autoplay.
+ *
+ * @param {ReturnType<typeof createState>} state
+ */
+export function clearPanelRefs(state) {
+  if (state.panelRelocateTimer) {
+    clearTimeout(state.panelRelocateTimer);
+    state.panelRelocateTimer = null;
+  }
+  state.panelMessage = null;
+  state.panelMessageId = null;
+  state.panelChannelId = null;
+  state.lastTrack = null;
 }
 
 export function trackKeys(track) {

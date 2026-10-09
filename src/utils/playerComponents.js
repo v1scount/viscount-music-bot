@@ -26,7 +26,11 @@ async function handlePlayerComponent(interaction, client, player) {
   } else if (action === "skip") {
     await player.skip();
   } else if (action === "stop") {
-    await stopPlayback(client, player);
+    const panelId = interaction.message?.id;
+    await stopPlayback(client, player, {
+      skipMessageIds: panelId ? [panelId] : [],
+    });
+    await interaction.deleteReply().catch(() => null);
     return;
   } else if (action === "autoplay") {
     state.autoplay = !state.autoplay;

@@ -72,9 +72,9 @@ If the bot is alone in a voice channel for `IDLE_LEAVE_MS` (default `300000` / 5
 
 ## Player panel
 
-The bot keeps one now-playing message per server and updates it as playback changes. Controls: Pause/Play, Skip, Stop, and Autoplay.
+The bot keeps the now-playing panel at the bottom of the channel by moving it whenever something else is posted below it. Controls: Pause/Play, Skip, Stop, and Autoplay. A new panel is posted when playback starts; the previous one is not reused.
 
-Panel **Stop** matches `/stop`: it clears the queue, ends the panel, and leaves the voice channel. Progress refreshes about every 5 seconds while playing (not while paused). Failed tracks are skipped automatically with a short channel notice.
+Panel **Stop** matches `/stop`: it clears the queue, deletes the bot’s messages in that text channel, and leaves the voice channel. Progress refreshes about every 5 seconds while playing (not while paused). Failed tracks are skipped automatically with a short channel notice.
 
 ## Autoplay
 

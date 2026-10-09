@@ -10,6 +10,14 @@ import {
   waitForVoiceConnection,
 } from "../utils/voiceConnection.js";
 import { refreshIdleTimer } from "../services/idleLeave.js";
+import {
+  mergeLoadedSearches,
+  settleWithin,
+} from "../utils/searchRank.js";
+
+const AUTOCOMPLETE_SEARCH_TIMEOUT_MS = 2200;
+const PLAY_SEARCH_TIMEOUT_MS = 6000;
+const SEARCH_SOURCES = ["ytmsearch", "ytsearch"];
 
 /**
  * @param {object} result
@@ -52,6 +60,35 @@ async function resolveCached(client, options) {
     resolveCache.set(cacheKey, result);
   }
   return cloneResolveResult(result, options.requester);
+}
+
+/**
+ * YouTube picks which song is the hit. Studio audio of that song stays ahead
+ * of its official video, which stays ahead of live, remix, and other uploads.
+ * @param {import("../client.js").MusicBot} client
+ * @param {string} query
+ * @param {unknown} requester
+ * @param {number} [timeoutMs]
+ */
+async function resolveRankedSearch(client, query, requester, timeoutMs) {
+  const pending = SEARCH_SOURCES.map((source) =>
+    resolveCached(client, { query, source, requester }).catch((error) => {
+      logError("search", error, { query, source });
+      return { loadType: "error", tracks: [] };
+    }),
+  );
+
+  const results = await settleWithin(pending, timeoutMs);
+  if (timeoutMs != null && results.some((result) => result == null)) {
+    log("search", `timed out query="${query}"`);
+  }
+
+  const merged = mergeLoadedSearches(query, results);
+  debug(
+    "search",
+    `query="${query}" loadType=${merged.loadType} tracks=${merged.tracks.length}`,
+  );
+  return merged;
 }
 
 export const data = new SlashCommandBuilder()
@@ -139,16 +176,12 @@ export async function autocomplete(interaction, client) {
   }
 
   try {
-    const result = await Promise.race([
-      resolveCached(client, {
-        query,
-        source: "ytsearch",
-        requester: interaction.user,
-      }),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("autocomplete search timeout")), 2200),
-      ),
-    ]);
+    const result = await resolveRankedSearch(
+      client,
+      query,
+      interaction.user,
+      AUTOCOMPLETE_SEARCH_TIMEOUT_MS,
+    );
 
     log(
       "autocomplete",
@@ -297,12 +330,18 @@ export async function execute(interaction, client) {
     );
   }
 
-  const result = await resolveCached(client, {
-    query,
-    // Let LavaSrc handle Spotify URLs; use YouTube search for plain text.
-    ...(isUrl ? {} : { source: "ytsearch" }),
-    requester: interaction.user,
-  });
+  // Links stay intact so LavaSrc can resolve Spotify. Plain text is ranked.
+  const result = isUrl
+    ? await resolveCached(client, {
+        query,
+        requester: interaction.user,
+      })
+    : await resolveRankedSearch(
+        client,
+        query,
+        interaction.user,
+        PLAY_SEARCH_TIMEOUT_MS,
+      );
 
   debug(
     "play",

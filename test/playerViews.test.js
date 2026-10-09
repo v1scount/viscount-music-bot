@@ -7,6 +7,8 @@ import {
 } from "../src/utils/playerPanel.js";
 import { buildQueueView } from "../src/utils/queueView.js";
 import { colors } from "../src/utils/theme.js";
+import { getPlayerState } from "../src/utils/playerState.js";
+import { stopPlayback } from "../src/utils/playback.js";
 
 function createTrack(index = 1) {
   return {
@@ -92,12 +94,14 @@ test("concurrent panel updates create only one message", async () => {
     },
   };
   const channel = {
+    lastMessageId: "other",
     isTextBased: () => true,
     isDMBased: () => false,
     messages: { fetch: async () => null },
     async send() {
       sends += 1;
       await new Promise((resolve) => setTimeout(resolve, 10));
+      channel.lastMessageId = message.id;
       return message;
     },
   };
@@ -122,4 +126,129 @@ test("concurrent panel updates create only one message", async () => {
 
   assert.equal(sends, 1);
   assert.equal(edits, 3);
+});
+
+test("panel relocates when it is no longer the last message", async () => {
+  let sends = 0;
+  let deletes = 0;
+  let edits = 0;
+  const existing = {
+    id: "panel-1",
+    channelId: "channel",
+    async edit() {
+      edits += 1;
+    },
+    async delete() {
+      deletes += 1;
+    },
+  };
+  const relocated = {
+    id: "panel-2",
+    channelId: "channel",
+    async edit() {
+      edits += 1;
+    },
+    async delete() {
+      deletes += 1;
+    },
+  };
+  const channel = {
+    lastMessageId: "queued-notice",
+    isTextBased: () => true,
+    isDMBased: () => false,
+    messages: { fetch: async () => null },
+    async send() {
+      sends += 1;
+      channel.lastMessageId = relocated.id;
+      return relocated;
+    },
+  };
+  const client = {
+    channels: {
+      cache: new Map([["channel", channel]]),
+      fetch: async () => null,
+    },
+  };
+  const player = {
+    ...createPlayer(2),
+    guildId: "guild-relocate",
+    textChannel: "channel",
+  };
+  const state = getPlayerState(client, player.guildId);
+  state.panelMessage = existing;
+  state.panelMessageId = existing.id;
+  state.panelChannelId = "channel";
+
+  await updatePlayerPanel(client, player);
+
+  assert.equal(sends, 1);
+  assert.equal(deletes, 1);
+  assert.equal(edits, 0);
+  assert.equal(state.panelMessageId, relocated.id);
+  assert.equal(state.panelMessage, relocated);
+});
+
+test("stopPlayback deletes the bot's channel messages and clears panel refs", async () => {
+  const botId = "bot";
+  const deleted = [];
+  const makeMessage = (id, authorId) => ({
+    id,
+    author: { id: authorId },
+    createdTimestamp: Date.now(),
+    async delete() {
+      deleted.push(id);
+    },
+  });
+  const channel = {
+    id: "channel",
+    isTextBased: () => true,
+    isDMBased: () => false,
+    guild: { members: { me: { id: botId } } },
+    permissionsFor() {
+      return { has: () => true };
+    },
+    messages: {
+      cache: new Map(),
+      async fetch() {
+        return new Map([
+          ["bot-1", makeMessage("bot-1", botId)],
+          ["user-1", makeMessage("user-1", "user")],
+          ["bot-2", makeMessage("bot-2", botId)],
+        ]);
+      },
+      async delete(id) {
+        deleted.push(id);
+      },
+    },
+    async bulkDelete(chunk) {
+      for (const message of chunk) deleted.push(message.id);
+    },
+  };
+  const client = {
+    user: { id: botId },
+    channels: {
+      cache: new Map([["channel", channel]]),
+      fetch: async () => null,
+    },
+    poru: { players: new Map() },
+  };
+  const player = {
+    guildId: "guild-stop",
+    textChannel: "channel",
+    queue: { clear() {} },
+    async destroy() {},
+  };
+  const state = getPlayerState(client, player.guildId);
+  state.panelMessageId = "bot-1";
+  state.panelChannelId = "channel";
+  state.lastTrack = createTrack();
+
+  await stopPlayback(client, player, { save: false });
+
+  assert.deepEqual(deleted.sort(), ["bot-1", "bot-2"]);
+  assert.equal(state.panelMessageId, null);
+  assert.equal(state.panelChannelId, null);
+  assert.equal(state.lastTrack, null);
+  assert.equal(state.stopping, false);
+  assert.equal(state.autoplay, true);
 });

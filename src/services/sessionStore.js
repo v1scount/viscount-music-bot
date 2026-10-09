@@ -79,8 +79,6 @@ export function collectSessions(client) {
     sessions[guildId] = {
       voiceChannelId: player.voiceChannel,
       textChannelId: player.textChannel ?? state.panelChannelId,
-      panelMessageId: state.panelMessageId,
-      panelChannelId: state.panelChannelId,
       autoplay: state.autoplay,
       position: player.position ?? 0,
       current: serializeTrack(player.currentTrack),
@@ -252,8 +250,8 @@ async function restoreGuildSession(client, guildId, session) {
   state.recentTrackKeys = Array.isArray(session.recentTrackKeys)
     ? session.recentTrackKeys
     : [];
-  state.panelMessageId = session.panelMessageId ?? null;
-  state.panelChannelId = session.panelChannelId ?? session.textChannelId;
+  state.panelMessageId = null;
+  state.panelChannelId = session.textChannelId ?? null;
   state.panelMessage = null;
 
   const playableCurrent = current

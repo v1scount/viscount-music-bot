@@ -56,8 +56,6 @@ test("collectSessions captures active guild players", () => {
   };
   const state = getPlayerState(client, "guild-1");
   state.autoplay = false;
-  state.panelMessageId = "msg";
-  state.panelChannelId = "text";
   state.recentTrackKeys = ["abc123"];
 
   const sessions = collectSessions(client);
@@ -66,4 +64,5 @@ test("collectSessions captures active guild players", () => {
   assert.equal(sessions["guild-1"].current.info.title, "Song");
   assert.equal(sessions["guild-1"].queue.length, 1);
   assert.equal(sessions["guild-1"].recentTrackKeys[0], "abc123");
+  assert.equal("panelMessageId" in sessions["guild-1"], false);
 });

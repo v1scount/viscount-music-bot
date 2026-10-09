@@ -25,5 +25,8 @@ export async function execute(interaction, client) {
 
   await stopPlayback(client, player);
 
-  return interaction.reply("Stopped playback and left the voice channel.");
+  return interaction.reply({
+    content: "Stopped playback and left the voice channel.",
+    flags: MessageFlags.Ephemeral,
+  });
 }

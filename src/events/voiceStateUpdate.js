@@ -1,6 +1,8 @@
 import { Events } from "discord.js";
-import { refreshIdleTimer, clearIdleTimer } from "../services/idleLeave.js";
+import { refreshIdleTimer } from "../services/idleLeave.js";
 import { getPlayer } from "../utils/voice.js";
+import { getPlayerState } from "../utils/playerState.js";
+import { clearSessionChannel, stopPlayback } from "../utils/playback.js";
 
 export const name = Events.VoiceStateUpdate;
 
@@ -11,6 +13,31 @@ export const name = Events.VoiceStateUpdate;
  */
 export async function execute(oldState, newState, client) {
   const guildId = newState.guild.id;
+  const botLeftVoice =
+    newState.id === client.user?.id &&
+    Boolean(oldState.channelId) &&
+    newState.channelId !== oldState.channelId;
+
+  if (botLeftVoice) {
+    const state = getPlayerState(client, guildId);
+    if (state.stopping) return;
+
+    const player = getPlayer(client, guildId);
+    const leftMusicChannel =
+      !player ||
+      !player.voiceChannel ||
+      player.voiceChannel === oldState.channelId;
+
+    if (!leftMusicChannel) return;
+
+    if (player) {
+      await stopPlayback(client, player);
+    } else {
+      await clearSessionChannel(client, guildId);
+    }
+    return;
+  }
+
   const player = getPlayer(client, guildId);
   if (!player?.voiceChannel) return;
 
@@ -18,16 +45,6 @@ export async function execute(oldState, newState, client) {
   const involved =
     oldState.channelId === channelId || newState.channelId === channelId;
   if (!involved) return;
-
-  // Bot left voice somehow — drop the idle timer.
-  if (
-    newState.id === client.user?.id &&
-    newState.channelId !== channelId &&
-    oldState.channelId === channelId
-  ) {
-    clearIdleTimer(guildId);
-    return;
-  }
 
   refreshIdleTimer(client, player);
 }

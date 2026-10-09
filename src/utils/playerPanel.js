@@ -11,8 +11,9 @@ import { formatDuration } from "./voice.js";
 import { colors } from "./theme.js";
 
 export const PLAYER_COMPONENT_PREFIX = "music:";
+export const PANEL_RELOCATE_DEBOUNCE_MS = 500;
 
-function isPlayerPanelMessage(message, botUserId) {
+export function isPlayerPanelMessage(message, botUserId) {
   if (message.author?.id !== botUserId) return false;
   return message.components?.some((row) =>
     row.components?.some((component) =>
@@ -130,8 +131,24 @@ export function buildPlayerPanel(player, state, { disabled = false } = {}) {
   return { embeds: [embed], components: [controls] };
 }
 
+export function schedulePanelRelocate(client, player) {
+  const state = getPlayerState(client, player.guildId);
+  if (state.stopping) return;
+
+  if (state.panelRelocateTimer) clearTimeout(state.panelRelocateTimer);
+  state.panelRelocateTimer = setTimeout(() => {
+    state.panelRelocateTimer = null;
+    if (state.stopping) return;
+    updatePlayerPanel(client, player).catch((error) =>
+      logError("playerPanel:relocate", error, { guildId: player.guildId }),
+    );
+  }, PANEL_RELOCATE_DEBOUNCE_MS);
+}
+
 export async function updatePlayerPanel(client, player, options = {}) {
   const state = getPlayerState(client, player.guildId);
+  if (state.stopping) return null;
+
   const previousUpdate = state.panelUpdatePromise ?? Promise.resolve();
   const updatePromise = previousUpdate.catch(() => null).then(async () => {
     const channelId = state.panelChannelId ?? player.textChannel;
@@ -141,6 +158,8 @@ export async function updatePlayerPanel(client, player, options = {}) {
       client.channels.cache.get(channelId) ??
       (await client.channels.fetch(channelId).catch(() => null));
     if (!channel?.isTextBased() || channel.isDMBased()) return null;
+
+    if (state.stopping) return null;
 
     const payload = buildPlayerPanel(player, state, options);
     let message =
@@ -152,13 +171,22 @@ export async function updatePlayerPanel(client, player, options = {}) {
         .catch(() => null);
     }
 
-    if (message) {
+    if (state.stopping) return null;
+
+    const isLatest = Boolean(message) && channel.lastMessageId === message.id;
+
+    if (message && isLatest) {
       await message.edit(payload);
     } else {
+      const previous = message;
       message = await channel.send(payload);
       state.panelMessageId = message.id;
       state.panelChannelId = channelId;
-      await cleanupOldPanels(channel, client, message.id);
+      if (previous) {
+        await previous.delete().catch(() => null);
+      } else {
+        await cleanupOldPanels(channel, client, message.id);
+      }
     }
     state.panelMessage = message;
     state.lastPanelUpdateAt = Date.now();
