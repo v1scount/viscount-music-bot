@@ -150,7 +150,7 @@ test("voice disconnect wipes messages even if player.voiceChannel is already cle
       cache: new Map([["text", channel]]),
       fetch: async () => null,
     },
-    poru: { players: new Map([[guildId, player]]) },
+    players: new Map([[guildId, player]]),
   };
   const state = getPlayerState(client, guildId);
   state.panelChannelId = "text";
@@ -202,7 +202,7 @@ test("voice disconnect wipes even after the player is already gone", async () =>
       cache: new Map([["text", channel]]),
       fetch: async () => null,
     },
-    poru: { players: new Map() },
+    players: new Map(),
   };
   const state = getPlayerState(client, guildId);
   state.panelChannelId = "text";
@@ -254,7 +254,7 @@ test("stopPlayback still wipes when the player was already destroyed", async () 
       cache: new Map([["text", channel]]),
       fetch: async () => null,
     },
-    poru: { players: new Map() },
+    players: new Map(),
   };
   const player = {
     guildId,

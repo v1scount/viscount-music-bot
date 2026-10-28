@@ -1,56 +1,40 @@
 # music-bot
 
-Private Discord music bot using Lavalink v4 (with LavaSrc), Poru, and YouTube Mix recommendations.
-
-The bot provides an interactive now-playing panel, editable queue, and similar-track autoplay when the manual queue ends.
+Private Discord music bot. Playback comes from a [librespot](https://github.com/librespot-org/librespot) engine logged into one Spotify Premium account. The bot keeps the queue, now-playing panel, and slash commands.
 
 ## Requirements
 
 - Node.js 20+
-- Docker (for Lavalink)
+- Docker (for the Spotify engine)
+- A Spotify Premium account
+
+librespot is an unofficial client. Spotify's terms forbid that, and free accounts cannot stream.
 
 ## Setup
 
-1. Copy `.env.example` to `.env` and fill in your Discord and Spotify credentials.
-2. Start Lavalink:
+1. Copy `.env.example` to `.env` and fill in Discord plus the Premium account.
+2. Start everything:
 
 ```bash
-docker compose up -d lavalink
+docker compose up -d --build
 ```
 
-3. Install dependencies:
+Slash commands are registered when the bot becomes ready. You can still deploy them with `npm run deploy-commands`.
+
+To run the bot on the host while the engine stays in Docker, publish the loopback ports (Compose does this) and:
 
 ```bash
 npm install
-```
-
-Slash commands are registered automatically when the bot becomes ready. You can still deploy them manually with `npm run deploy-commands`.
-
-4. Run the bot:
-
-```bash
 npm start
 ```
 
-Or run everything with Docker:
+The engine stores Spotify credentials in the `spotify-cache` volume so it can reuse them after the first login. If Spotify rejects the username and password, `docker logs -f music-bot-spotify` prints a browser link. Open that link on this machine, approve access, and the engine continues. The callback is `http://127.0.0.1:8898/login`.
 
-```bash
-docker compose up -d
-```
+One Premium account can play in one server at a time. A second server is refused while a stream is active.
 
-For local/`npm start` use `LAVALINK_HOST=127.0.0.1`. Inside Compose, the bot uses the `lavalink` service name automatically.
+## Persistence and idle leave
 
-Compose includes a one-shot `lavalink-plugins-init` service that `chown`s the plugins volume to uid `322` (Lavalink’s user). Empty named volumes are created as root and otherwise cause `Permission denied` when downloading plugins. If you bind-mount a host directory instead, fix ownership with:
-
-```bash
-sudo mkdir -p lavalink/plugins && sudo chown -R 322:322 lavalink/plugins
-```
-
-## Persistence & idle leave
-
-Player sessions are saved to a JSON file (`DATA_PATH`, default `./data/sessions.json` locally or `/app/data/sessions.json` in Docker). On shutdown the bot flushes the file; on startup it restores voice, queue, panel, and autoplay when possible.
-
-Compose mounts a `bot-data` volume at `/app/data` for that file.
+Player sessions are saved to a JSON file (`DATA_PATH`, default `./data/sessions.json` locally or `/app/data/sessions.json` in Docker). Tracks are stored as Spotify URIs. Older YouTube sessions are ignored.
 
 If the bot is alone in a voice channel for `IDLE_LEAVE_MS` (default `300000` / 5 minutes), it clears the queue and leaves.
 
@@ -58,7 +42,7 @@ If the bot is alone in a voice channel for `IDLE_LEAVE_MS` (default `300000` / 5
 
 | Command | Description |
 |---------|-------------|
-| `/play` | Play a song or add it to the queue |
+| `/play` | Play a Spotify track, album, playlist, or search |
 | `/pause` | Pause playback |
 | `/resume` | Resume playback |
 | `/skip` | Skip the current track |
@@ -68,7 +52,9 @@ If the bot is alone in a voice channel for `IDLE_LEAVE_MS` (default `300000` / 5
 | `/remove position` | Remove an upcoming track |
 | `/move from to` | Reorder an upcoming track |
 | `/clear` | Clear upcoming tracks without stopping |
-| `/autoplay enabled` | Toggle YouTube Mix autoplay |
+| `/autoplay enabled` | Toggle Spotify radio autoplay |
+
+YouTube and other non-Spotify links are declined.
 
 ## Player panel
 
@@ -78,13 +64,13 @@ Panel **Stop** matches `/stop`: it clears the queue, deletes the bot’s message
 
 ## Autoplay
 
-Autoplay is enabled by default. When the manual queue ends, the bot builds a YouTube Mix from the last song and chooses a related track. If the original song came from Spotify, SoundCloud, or another source, the bot first finds its YouTube Music equivalent. Recently played tracks are excluded, manually queued tracks always take priority, and a YouTube Music search is used if the Mix is unavailable.
+Autoplay is enabled by default. When the manual queue ends, the bot asks Spotify for radio based on the last track. Recently played tracks are excluded, and manually queued tracks always take priority.
 
 Use `/autoplay enabled:false` or the panel button to disable it for a server.
 
-## Development
+Albums and playlists queue up to 100 tracks.
 
-Run the unit tests with:
+## Development
 
 ```bash
 npm test

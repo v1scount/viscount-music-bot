@@ -10,7 +10,6 @@ import { getPlayerState } from "../src/utils/playerState.js";
 
 function createTrack(title = "Song") {
   return {
-    track: "encoded-track-data",
     info: {
       identifier: "abc123",
       isSeekable: true,
@@ -19,14 +18,12 @@ function createTrack(title = "Song") {
       isStream: false,
       position: 0,
       title,
-      uri: "https://example.com/song",
-      artworkUrl: "https://example.com/art.jpg",
+      uri: "spotify:track:abc123",
+      artworkUrl: "https://i.scdn.co/image/art",
       isrc: null,
-      sourceName: "youtube",
+      sourceName: "spotify",
       requester: { id: "user1" },
     },
-    pluginInfo: {},
-    userData: {},
   };
 }
 
@@ -36,10 +33,31 @@ test("serializeTrack / deserializeTrack round-trip", () => {
   const restored = deserializeTrack(serialized);
 
   assert.ok(serialized);
-  assert.equal(serialized.encoded, "encoded-track-data");
-  assert.equal(restored.track, "encoded-track-data");
+  assert.equal(serialized.info.uri, "spotify:track:abc123");
   assert.equal(restored.info.title, "Round Trip");
   assert.equal(restored.info.requester.id, "user1");
+  assert.equal(restored.info.sourceName, "spotify");
+});
+
+test("youtube encodings are ignored", () => {
+  const youtube = {
+    track: "encoded-track-data",
+    info: {
+      identifier: "abc",
+      title: "Video",
+      author: "Channel",
+      uri: "https://youtu.be/abc",
+      sourceName: "youtube",
+    },
+  };
+  assert.equal(serializeTrack(youtube), null);
+  assert.equal(
+    deserializeTrack({
+      encoded: "encoded-track-data",
+      info: youtube.info,
+    }),
+    null,
+  );
 });
 
 test("collectSessions captures active guild players", () => {
@@ -52,7 +70,7 @@ test("collectSessions captures active guild players", () => {
     queue: [createTrack("Next")],
   };
   const client = {
-    poru: { players: new Map([["guild-1", player]]) },
+    players: new Map([["guild-1", player]]),
   };
   const state = getPlayerState(client, "guild-1");
   state.autoplay = false;

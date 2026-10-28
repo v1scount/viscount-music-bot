@@ -48,7 +48,7 @@ export async function clearSessionChannel(
  * Clear the queue, wipe the bot's channel messages, destroy the player, and leave voice.
  *
  * @param {import("../client.js").MusicBot} client
- * @param {import("poru").Player} player
+ * @param {{ guildId: string, textChannel?: string | null, queue: { clear: () => unknown }, destroy: () => Promise<void> | void }} player
  * @param {{ save?: boolean, skipMessageIds?: Array<string | null | undefined> }} [options]
  */
 export async function stopPlayback(client, player, options = {}) {

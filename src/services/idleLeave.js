@@ -25,7 +25,7 @@ export function isBotAlone(channel) {
 
 /**
  * @param {import("../client.js").MusicBot} client
- * @param {import("poru").Player} player
+ * @param {{ guildId: string, voiceChannel?: string | null }} player
  */
 export function refreshIdleTimer(client, player) {
   const guildId = player.guildId;
@@ -54,7 +54,7 @@ export function refreshIdleTimer(client, player) {
 
   const timer = setTimeout(async () => {
     timers.delete(guildId);
-    const current = client.poru.players.get(guildId);
+    const current = client.players.get(guildId);
     if (!current) return;
 
     const voiceChannel = client.guilds.cache

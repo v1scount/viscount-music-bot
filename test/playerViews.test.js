@@ -230,7 +230,7 @@ test("stopPlayback deletes the bot's channel messages and clears panel refs", as
       cache: new Map([["channel", channel]]),
       fetch: async () => null,
     },
-    poru: { players: new Map() },
+    players: new Map(),
   };
   const player = {
     guildId: "guild-stop",

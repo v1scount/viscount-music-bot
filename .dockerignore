@@ -2,6 +2,5 @@ node_modules
 .git
 .env
 *.md
-lavalink/plugins
-lavalink/logs
+spotify-engine/target
 .DS_Store

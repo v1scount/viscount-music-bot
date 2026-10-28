@@ -1,51 +1,38 @@
 services:
-  # Empty named volumes are created as root; Lavalink runs as uid 322 and
-  # cannot download plugins until the mount is writable by that user.
-  lavalink-plugins-init:
-    image: alpine:3.20
-    user: "0:0"
-    volumes:
-      - lavalink-plugins:/plugins
-    command:
-      - sh
-      - -c
-      - rm -f /plugins/youtube-plugin-*.jar && chown -R 322:322 /plugins
-    restart: "no"
-
-  lavalink:
-    image: ghcr.io/lavalink-devs/lavalink:4
-    container_name: music-bot-lavalink
+  spotify-engine:
+    build: ./spotify-engine
+    container_name: music-bot-spotify
     restart: unless-stopped
-    depends_on:
-      lavalink-plugins-init:
-        condition: service_completed_successfully
     environment:
-      LAVALINK_PASSWORD: ${LAVALINK_PASSWORD}
-      SPOTIFY_CLIENT_ID: ${SPOTIFY_CLIENT_ID}
-      SPOTIFY_CLIENT_SECRET: ${SPOTIFY_CLIENT_SECRET}
-      YOUTUBE_OAUTH_REFRESH_TOKEN: ${YOUTUBE_OAUTH_REFRESH_TOKEN:-}
+      SPOTIFY_USERNAME: ${SPOTIFY_USERNAME}
+      SPOTIFY_PASSWORD: ${SPOTIFY_PASSWORD}
+      SPOTIFY_CACHE: /var/lib/spotify-cache
+      ENGINE_HTTP_ADDR: 0.0.0.0:8090
+      ENGINE_PCM_ADDR: 0.0.0.0:8091
+      RUST_LOG: ${RUST_LOG:-info}
     volumes:
-      - ./lavalink/application.yml:/opt/Lavalink/application.yml:ro
-      - lavalink-plugins:/opt/Lavalink/plugins
+      - spotify-cache:/var/lib/spotify-cache
     networks:
       - music-bot
-    # Published for local/WSL bots running on the host (npm start)
+    # Loopback only, so `npm start` on the host can reach the engine.
     ports:
-      - "2333:2333"
+      - "127.0.0.1:8090:8090"
+      - "127.0.0.1:8091:8091"
+      - "127.0.0.1:8898:8899"
 
   bot:
     build: .
     container_name: music-bot
     restart: unless-stopped
     depends_on:
-      - lavalink
+      - spotify-engine
     environment:
       DISCORD_TOKEN: ${DISCORD_TOKEN}
       DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
       DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
-      LAVALINK_HOST: lavalink
-      LAVALINK_PORT: 2333
-      LAVALINK_PASSWORD: ${LAVALINK_PASSWORD}
+      SPOTIFY_ENGINE_URL: http://spotify-engine:8090
+      SPOTIFY_PCM_HOST: spotify-engine
+      SPOTIFY_PCM_PORT: 8091
       DEBUG: ${DEBUG:-false}
       DATA_PATH: /app/data/sessions.json
       IDLE_LEAVE_MS: ${IDLE_LEAVE_MS:-300000}
@@ -55,7 +42,7 @@ services:
       - music-bot
 
 volumes:
-  lavalink-plugins:
+  spotify-cache:
   bot-data:
 
 networks:

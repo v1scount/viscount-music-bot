@@ -1,115 +1,73 @@
 import { MessageFlags, SlashCommandBuilder } from "discord.js";
-import { Track } from "poru";
 import { debug, log, logError } from "../utils/logger.js";
 import { updatePlayerPanel } from "../utils/playerPanel.js";
 import { resolveCache } from "../utils/resolveCache.js";
+import { classifyQuery } from "../utils/spotifyQuery.js";
+import { rankSearchResults } from "../utils/searchRank.js";
 import { formatDuration, requireVoiceChannel } from "../utils/voice.js";
 import {
   assertCanJoinVoice,
   ensurePlayer,
+  streamBusyMessage,
   waitForVoiceConnection,
 } from "../utils/voiceConnection.js";
 import { refreshIdleTimer } from "../services/idleLeave.js";
-import {
-  mergeLoadedSearches,
-  settleWithin,
-} from "../utils/searchRank.js";
 
 const AUTOCOMPLETE_SEARCH_TIMEOUT_MS = 2200;
 const PLAY_SEARCH_TIMEOUT_MS = 6000;
-const SEARCH_SOURCES = ["ytmsearch", "ytsearch"];
+
+const UNSUPPORTED =
+  "This bot only plays Spotify. Paste a Spotify track, album, or playlist link, or search by name.";
 
 /**
- * @param {object} result
- * @param {unknown} [requester]
- */
-function cloneResolveResult(result, requester) {
-  if (!result?.tracks?.length) return result;
-  return {
-    ...result,
-    tracks: result.tracks.map(
-      (track) =>
-        new Track(
-          {
-            encoded: track.track,
-            info: { ...track.info },
-            pluginInfo: { ...(track.pluginInfo ?? {}) },
-            userData: { ...(track.userData ?? {}) },
-          },
-          requester ?? track.info?.requester,
-        ),
-    ),
-  };
-}
-
-/**
- * @param {import("../client.js").MusicBot} client
- * @param {{ query: string, source?: string, requester: unknown }} options
- */
-async function resolveCached(client, options) {
-  const source = options.source ?? "url";
-  const cacheKey = resolveCache.key(source, options.query);
-  const cached = resolveCache.get(cacheKey);
-  if (cached) {
-    debug("resolveCache", `hit ${cacheKey}`);
-    return cloneResolveResult(cached, options.requester);
-  }
-
-  const result = await client.poru.resolve(options);
-  if (result.loadType !== "error") {
-    resolveCache.set(cacheKey, result);
-  }
-  return cloneResolveResult(result, options.requester);
-}
-
-/**
- * YouTube picks which song is the hit. Studio audio of that song stays ahead
- * of its official video, which stays ahead of live, remix, and other uploads.
  * @param {import("../client.js").MusicBot} client
  * @param {string} query
  * @param {unknown} requester
- * @param {number} [timeoutMs]
+ * @param {number} timeoutMs
  */
-async function resolveRankedSearch(client, query, requester, timeoutMs) {
-  const pending = SEARCH_SOURCES.map((source) =>
-    resolveCached(client, { query, source, requester }).catch((error) => {
-      logError("search", error, { query, source });
-      return { loadType: "error", tracks: [] };
-    }),
-  );
-
-  const results = await settleWithin(pending, timeoutMs);
-  if (timeoutMs != null && results.some((result) => result == null)) {
-    log("search", `timed out query="${query}"`);
+async function resolveQuery(client, query, requester, timeoutMs) {
+  const classified = classifyQuery(query);
+  if (classified.kind === "unsupported") {
+    return { loadType: "unsupported", tracks: [] };
   }
 
-  const merged = mergeLoadedSearches(query, results);
-  debug(
-    "search",
-    `query="${query}" loadType=${merged.loadType} tracks=${merged.tracks.length}`,
-  );
-  return merged;
+  const source = classified.kind === "search" ? "search" : classified.kind;
+  const cacheKey = resolveCache.key(source, classified.uri ?? classified.query);
+  const cached = resolveCache.get(cacheKey);
+  if (cached) {
+    debug("resolveCache", `hit ${cacheKey}`);
+    return cloneResult(cached, requester);
+  }
+
+  const result =
+    classified.kind === "search"
+      ? await client.spotify.search(classified.query, timeoutMs)
+      : await client.spotify.resolve(classified.uri, timeoutMs);
+
+  if (classified.kind === "search" && result.loadType === "search") {
+    result.tracks = rankSearchResults(classified.query, result.tracks);
+  }
+
+  if (result.loadType !== "error") {
+    resolveCache.set(cacheKey, result);
+  }
+  return cloneResult(result, requester);
 }
 
-export const data = new SlashCommandBuilder()
-  .setName("play")
-  .setDescription("Play a track, album, playlist, or search query")
-  .addStringOption((option) =>
-    option
-      .setName("query")
-      .setDescription("Spotify/YouTube URL or search terms")
-      .setRequired(true)
-      .setAutocomplete(true),
-  );
-
 /**
- * @param {import("../client.js").MusicBot} client
+ * @param {object} result
+ * @param {unknown} requester
  */
-function getConnectedNode(client) {
-  for (const node of client.poru.nodes.values()) {
-    if (node.isConnected) return node;
-  }
-  return null;
+function cloneResult(result, requester) {
+  return {
+    ...result,
+    tracks: (result.tracks ?? []).map((track) => ({
+      info: {
+        ...track.info,
+        requester: requester ?? track.info?.requester,
+      },
+    })),
+  };
 }
 
 /**
@@ -124,20 +82,24 @@ function truncate(text, max = 100) {
 }
 
 /**
- * @param {import("poru").Track} track
+ * @param {{ info: { uri?: string } }} track
  */
 function trackChoiceValue(track) {
   const uri = track.info.uri?.trim();
   if (uri && uri.length <= 100) return uri;
-
-  const id = track.info.identifier?.trim();
-  if (id) {
-    const short = `https://youtu.be/${id}`;
-    if (short.length <= 100) return short;
-  }
-
   return null;
 }
+
+export const data = new SlashCommandBuilder()
+  .setName("play")
+  .setDescription("Play a track, album, playlist, or search query")
+  .addStringOption((option) =>
+    option
+      .setName("query")
+      .setDescription("Spotify link or search terms")
+      .setRequired(true)
+      .setAutocomplete(true),
+  );
 
 /**
  * @param {import("discord.js").AutocompleteInteraction} interaction
@@ -156,27 +118,30 @@ export async function autocomplete(interaction, client) {
     return interaction.respond([]);
   }
 
-  // Respond immediately with the typed query so Discord always has choices
-  // within the 3s window even if Lavalink is slow.
   /** @type {import("discord.js").ApplicationCommandOptionChoiceData[]} */
   const choices = [
     { name: truncate(`Search: ${query}`), value: truncate(query) },
   ];
 
-  if (/^https?:\/\//i.test(query) || /^[a-z0-9]+:/i.test(query)) {
+  const classified = classifyQuery(query);
+  if (classified.kind === "track" || classified.kind === "album" || classified.kind === "playlist") {
     return interaction.respond([
-      { name: truncate(`Use link: ${query}`), value: truncate(query) },
+      { name: truncate(`Play ${classified.kind}: ${query}`), value: truncate(query) },
+    ]);
+  }
+  if (classified.kind === "unsupported") {
+    return interaction.respond([
+      { name: truncate("Spotify links only"), value: truncate(query) },
     ]);
   }
 
-  const node = getConnectedNode(client);
-  if (!node) {
-    log("autocomplete", "No Lavalink node connected — returning typed query only");
+  if (!(await client.spotify.healthy())) {
+    log("autocomplete", "Spotify engine is down — returning typed query only");
     return interaction.respond(choices);
   }
 
   try {
-    const result = await resolveRankedSearch(
+    const result = await resolveQuery(
       client,
       query,
       interaction.user,
@@ -271,48 +236,29 @@ export async function execute(interaction, client) {
     });
   }
 
-  const node = getConnectedNode(client);
-  if (!node) {
-    const hosts = [...client.poru.nodes.values()]
-      .map(
-        (n) =>
-          `${n.name} (${n.options?.host ?? n.host}:${n.options?.port ?? n.port}, connected=${n.isConnected})`,
-      )
-      .join(", ");
+  const busy = streamBusyMessage(client, interaction.guildId);
+  if (busy) {
+    return interaction.reply({
+      content: busy,
+      flags: MessageFlags.Ephemeral,
+    });
+  }
 
-    log("play", `No connected Lavalink node. Configured: ${hosts || "none"}`);
-
+  if (!(await client.spotify.healthy())) {
+    log("play", "Spotify engine is not healthy");
     return interaction.reply({
       content:
-        "Lavalink is not connected. Start it (e.g. `docker compose up -d lavalink`) and set `LAVALINK_HOST=127.0.0.1` when running the bot on the host/WSL.",
+        "Spotify is not connected. Start the engine (`docker compose up -d spotify-engine`) and set `SPOTIFY_USERNAME` / `SPOTIFY_PASSWORD` for a Premium account.",
       flags: MessageFlags.Ephemeral,
     });
   }
 
   await interaction.deferReply();
 
-  let query = interaction.options.getString("query", true).trim();
-  // YouTube Mix/radio links (`list=RD…`) resolve as ~25 related tracks and make
-  // /skip look like it is playing “songs by the same artist” instead of the queue.
-  if (/^https?:\/\//i.test(query) && /[?&]list=RD/i.test(query)) {
-    try {
-      const url = new URL(query);
-      url.searchParams.delete("list");
-      url.searchParams.delete("start_radio");
-      url.searchParams.delete("index");
-      query = url.toString();
-      debug("play", `Stripped YouTube Mix params → ${query}`);
-    } catch {
-      // keep original query if URL parsing fails
-    }
-  }
-  const isUrl = /^https?:\/\//i.test(query) || query.includes(":");
-
+  const query = interaction.options.getString("query", true).trim();
   debug("play", {
     query,
-    isUrl,
     voiceChannelId: voice.voiceChannelId,
-    node: `${node.name}@${node.options?.host ?? node.host}:${node.options?.port ?? node.port}`,
   });
 
   const player = ensurePlayer(client, {
@@ -330,35 +276,36 @@ export async function execute(interaction, client) {
     );
   }
 
-  // Links stay intact so LavaSrc can resolve Spotify. Plain text is ranked.
-  const result = isUrl
-    ? await resolveCached(client, {
-        query,
-        requester: interaction.user,
-      })
-    : await resolveRankedSearch(
-        client,
-        query,
-        interaction.user,
-        PLAY_SEARCH_TIMEOUT_MS,
-      );
+  let result;
+  try {
+    result = await resolveQuery(
+      client,
+      query,
+      interaction.user,
+      PLAY_SEARCH_TIMEOUT_MS,
+    );
+  } catch (error) {
+    logError("play:resolve", error, { query });
+    return interaction.editReply("Failed to load that query.");
+  }
 
   debug(
     "play",
     `resolve loadType=${result.loadType}, tracks=${result.tracks?.length ?? 0}`,
   );
 
+  if (result.loadType === "unsupported") {
+    return interaction.editReply(UNSUPPORTED);
+  }
+
   if (result.loadType === "error") {
     return interaction.editReply("Failed to load that query.");
   }
 
-  if (result.loadType === "empty") {
+  if (result.loadType === "empty" || result.tracks.length === 0) {
     return interaction.editReply("No results found.");
   }
 
-  // Only start if the player is fully idle. Checking isPlaying alone races
-  // (false during pause / mid-updatePlayer); checking currentTrack alone also
-  // races (cleared briefly on TrackEnd). Either signal means "don't replace".
   const shouldStart =
     !player.currentTrack && !player.isPlaying && !player.isPaused;
 
@@ -370,54 +317,21 @@ export async function execute(interaction, client) {
     queueLength: player.queue.length,
   });
 
-  if (result.loadType === "playlist") {
-    // YouTube Mix / radio URLs (list=RD…) resolve as playlists of related
-    // tracks — same artist / similar songs. Only keep the seed track so skip
-    // advances to what the user actually queued next.
-    const playlistName = result.playlistInfo?.name ?? "";
-    const isRadioMix =
-      /[?&]list=RD/i.test(query) || /^mix\b/i.test(playlistName.trim());
+  const tracks =
+    result.loadType === "playlist" ? result.tracks : result.tracks.slice(0, 1);
 
-    const tracks = isRadioMix
-      ? result.tracks.slice(0, 1)
-      : result.tracks;
-
-    for (const track of tracks) {
-      track.info.requester = interaction.user;
-      player.queue.add(track);
-    }
-
-    if (shouldStart) {
-      await player.play();
-    }
-
-    if (!shouldStart) {
-      await updatePlayerPanel(client, player);
-    }
-    refreshIdleTimer(client, player);
-
-    if (isRadioMix) {
-      const track = tracks[0];
-      return interaction.editReply(
-        shouldStart
-          ? `Playing **${track.info.title}** by ${track.info.author} (ignored YouTube Mix related tracks).`
-          : `Queued **${track.info.title}** by ${track.info.author} (ignored YouTube Mix related tracks).`,
-      );
-    }
-
-    return interaction.editReply(
-      shouldStart
-        ? `Playing playlist **${playlistName || "Unknown"}** (${tracks.length} tracks).`
-        : `Queued playlist **${playlistName || "Unknown"}** (${tracks.length} tracks).`,
-    );
+  for (const track of tracks) {
+    track.info.requester = interaction.user;
+    player.queue.add(track);
   }
 
-  const track = result.tracks[0];
-  track.info.requester = interaction.user;
-  player.queue.add(track);
-
   if (shouldStart) {
-    await player.play();
+    try {
+      await player.play();
+    } catch (error) {
+      logError("play:start", error, { guildId: interaction.guildId });
+      return interaction.editReply("Couldn't start playback.");
+    }
   }
 
   if (!shouldStart) {
@@ -425,6 +339,16 @@ export async function execute(interaction, client) {
   }
   refreshIdleTimer(client, player);
 
+  if (result.loadType === "playlist") {
+    const playlistName = result.playlistInfo?.name || "Unknown";
+    return interaction.editReply(
+      shouldStart
+        ? `Playing playlist **${playlistName}** (${tracks.length} tracks).`
+        : `Queued playlist **${playlistName}** (${tracks.length} tracks).`,
+    );
+  }
+
+  const track = tracks[0];
   return interaction.editReply(
     shouldStart
       ? `Playing **${track.info.title}** by ${track.info.author}.`
