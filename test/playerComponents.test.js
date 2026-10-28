@@ -17,7 +17,7 @@ function createTrack(index = 1) {
 
 function createClient(player) {
   return {
-    poru: { players: new Map([[player.guildId, player]]) },
+    players: new Map([[player.guildId, player]]),
     channels: {
       cache: new Map(),
       async fetch() {
@@ -162,7 +162,7 @@ test("stop button stops playback without waiting to delete the panel", async () 
   };
   const client = {
     user: { id: "bot" },
-    poru: { players: new Map([[player.guildId, player]]) },
+    players: new Map([[player.guildId, player]]),
     channels: {
       cache: new Map([["channel", channel]]),
       fetch: async () => null,

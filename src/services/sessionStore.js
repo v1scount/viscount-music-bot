@@ -1,6 +1,5 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { Track } from "poru";
 import { config } from "../config.js";
 import { debug, log, logError } from "../utils/logger.js";
 import { getPlayerState } from "../utils/playerState.js";
@@ -17,13 +16,16 @@ let saveTimer = null;
 /** @type {import("../client.js").MusicBot | null} */
 let pendingClient = null;
 
+function isSpotifyTrack(track) {
+  return typeof track?.info?.uri === "string" && track.info.uri.startsWith("spotify:");
+}
+
 /**
- * @param {import("poru").Track | null | undefined} track
+ * @param {{ info?: object } | null | undefined} track
  */
 export function serializeTrack(track) {
-  if (!track?.track) return null;
+  if (!isSpotifyTrack(track)) return null;
   return {
-    encoded: track.track,
     info: {
       identifier: track.info.identifier,
       isSeekable: track.info.isSeekable,
@@ -32,13 +34,11 @@ export function serializeTrack(track) {
       isStream: track.info.isStream,
       position: track.info.position ?? 0,
       title: track.info.title,
-      uri: track.info.uri ?? null,
+      uri: track.info.uri,
       artworkUrl: track.info.artworkUrl ?? null,
       isrc: track.info.isrc ?? null,
-      sourceName: track.info.sourceName ?? "unknown",
+      sourceName: "spotify",
     },
-    pluginInfo: track.pluginInfo ?? {},
-    userData: track.userData ?? {},
     requester:
       typeof track.info.requester === "string"
         ? track.info.requester
@@ -52,16 +52,14 @@ export function serializeTrack(track) {
  * @param {ReturnType<typeof serializeTrack>} data
  */
 export function deserializeTrack(data) {
-  if (!data?.encoded || !data.info) return null;
-  return new Track(
-    {
-      encoded: data.encoded,
-      info: data.info,
-      pluginInfo: data.pluginInfo ?? {},
-      userData: data.userData ?? {},
+  if (!data?.info?.uri || !String(data.info.uri).startsWith("spotify:")) return null;
+  return {
+    info: {
+      ...data.info,
+      sourceName: "spotify",
+      requester: data.requester,
     },
-    data.requester,
-  );
+  };
 }
 
 /**
@@ -70,9 +68,9 @@ export function deserializeTrack(data) {
 export function collectSessions(client) {
   /** @type {Record<string, object>} */
   const sessions = {};
-  if (!client?.poru?.players) return sessions;
+  if (!client?.players) return sessions;
 
-  for (const [guildId, player] of client.poru.players) {
+  for (const [guildId, player] of client.players) {
     if (!player.currentTrack && player.queue.length === 0) continue;
 
     const state = getPlayerState(client, guildId);
@@ -154,44 +152,24 @@ export async function loadSessions() {
 
 /**
  * @param {import("../client.js").MusicBot} client
- * @param {import("poru").Track} track
- */
-async function ensurePlayableTrack(client, track) {
-  if (track.track) return track;
-  if (!track.info?.uri) return null;
-  const result = await client.poru.resolve({
-    query: track.info.uri,
-    requester: track.info.requester,
-  });
-  if (["error", "empty"].includes(result.loadType)) return null;
-  const resolved = result.tracks?.[0];
-  if (!resolved) return null;
-  resolved.info.requester = track.info.requester;
-  return resolved;
-}
-
-/**
- * @param {import("../client.js").MusicBot} client
  * @param {number} [timeoutMs]
  */
-async function waitForLavalink(client, timeoutMs = 15000) {
+async function waitForEngine(client, timeoutMs = 15000) {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
-    for (const node of client.poru.nodes.values()) {
-      if (node.isConnected) return node;
-    }
+    if (await client.spotify.healthy()) return true;
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
-  return null;
+  return false;
 }
 
 /**
  * @param {import("../client.js").MusicBot} client
  */
 export async function restoreSessions(client) {
-  const node = await waitForLavalink(client);
-  if (!node) {
-    log("sessionStore", "Skipping restore — Lavalink not connected");
+  const ready = await waitForEngine(client);
+  if (!ready) {
+    log("sessionStore", "Skipping restore — Spotify engine is not connected");
     return;
   }
 
@@ -228,14 +206,15 @@ async function restoreGuildSession(client, guildId, session) {
     return;
   }
 
-  const current = session.current
-    ? deserializeTrack(session.current)
-    : null;
+  const current = session.current ? deserializeTrack(session.current) : null;
   const queueTracks = (session.queue ?? [])
     .map((item) => deserializeTrack(item))
     .filter(Boolean);
 
-  if (!current && queueTracks.length === 0) return;
+  if (!current && queueTracks.length === 0) {
+    log("sessionStore", `Ignoring non-Spotify session for guild ${guildId}`);
+    return;
+  }
 
   const player = ensurePlayer(client, {
     guildId,
@@ -254,20 +233,15 @@ async function restoreGuildSession(client, guildId, session) {
   state.panelChannelId = session.textChannelId ?? null;
   state.panelMessage = null;
 
-  const playableCurrent = current
-    ? await ensurePlayableTrack(client, current)
-    : null;
-
   for (const queued of queueTracks) {
-    const playable = await ensurePlayableTrack(client, queued);
-    if (playable) player.queue.add(playable);
+    player.queue.add(queued);
   }
 
-  if (playableCurrent) {
-    player.queue.splice(0, 0, playableCurrent);
+  if (current) {
+    player.queue.unshift(current);
     await player.play();
     const position = Number(session.position) || 0;
-    if (position > 5_000 && !playableCurrent.info.isStream) {
+    if (position > 5_000 && !current.info.isStream) {
       try {
         await player.seekTo(position);
         player.position = position;

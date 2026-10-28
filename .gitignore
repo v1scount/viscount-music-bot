@@ -3,5 +3,6 @@ node_modules/
 *.log
 oauth-qr.png
 .DS_Store
-lavalink/plugins/
-lavalink/logs/
+spotify-engine/target/
+.cargo/
+.rustup/

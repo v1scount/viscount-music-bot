@@ -52,7 +52,7 @@ test("refreshIdleTimer starts once and clearIdleTimer cancels it", () => {
         ],
       ]),
     },
-    poru: { players: new Map([["g1", player]]) },
+    players: new Map([["g1", player]]),
   };
 
   clearAllIdleTimers();

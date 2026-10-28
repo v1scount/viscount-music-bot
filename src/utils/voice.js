@@ -53,7 +53,7 @@ export function requireVoiceChannel(interaction) {
  * @param {string} guildId
  */
 export function getPlayer(client, guildId) {
-  return client.poru.players.get(guildId) ?? null;
+  return client.players?.get(guildId) ?? null;
 }
 
 /**

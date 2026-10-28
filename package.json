@@ -1,7 +1,7 @@
 {
   "name": "music-bot",
   "version": "1.0.0",
-  "description": "Private Discord music bot with Lavalink v4 + LavaSrc metadata mirroring",
+  "description": "Private Discord music bot with librespot playback",
   "main": "src/index.js",
   "type": "module",
   "scripts": {
@@ -13,8 +13,10 @@
     "node": ">=20"
   },
   "dependencies": {
+    "@discordjs/opus": "^0.10.0",
+    "@discordjs/voice": "^0.19.2",
     "discord.js": "^14.19.3",
     "dotenv": "^16.5.0",
-    "poru": "^5.3.0"
+    "libsodium-wrappers": "^0.7.15"
   }
 }

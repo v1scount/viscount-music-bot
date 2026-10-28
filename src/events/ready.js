@@ -2,7 +2,7 @@ import { Events } from "discord.js";
 import { config } from "../config.js";
 import { deployCommandsSafe } from "../services/deployCommands.js";
 import { restoreSessions } from "../services/sessionStore.js";
-import { debug, log, logError } from "../utils/logger.js";
+import { log, logError } from "../utils/logger.js";
 
 export const name = Events.ClientReady;
 export const once = true;
@@ -10,54 +10,23 @@ export const once = true;
 export async function execute(readyClient, client) {
   await deployCommandsSafe();
 
-  await client.poru.init(client);
-
-  // Wrap Poru's Discord voice send so we can see if OP4 is actually emitted.
-  const originalSend = client.poru.send?.bind(client.poru);
-  client.poru.send = (packet) => {
-    const guild = client.guilds.cache.get(packet?.d?.guild_id);
-    debug("voiceSend", {
-      op: packet?.op,
-      guildId: packet?.d?.guild_id,
-      channelId: packet?.d?.channel_id,
-      guildCached: Boolean(guild),
-      shardId: guild?.shardId,
-      hasShard: Boolean(guild?.shard),
-    });
-
-    if (!guild) {
-      log("voiceSend", `No guild in cache for ${packet?.d?.guild_id}`);
-      return;
-    }
-    if (!guild.shard) {
-      log("voiceSend", `No shard available for guild ${guild.id}`);
-      return;
-    }
-
-    if (originalSend) {
-      originalSend(packet);
-    } else {
-      guild.shard.send(packet);
-    }
-  };
-
-  client.on(Events.Raw, (packet) => {
-    if (
-      packet.t === "VOICE_STATE_UPDATE" &&
-      packet.d?.user_id === client.user.id
-    ) {
-      debug("rawVoiceState", {
-        guildId: packet.d.guild_id,
-        channelId: packet.d.channel_id,
-        sessionId: packet.d.session_id,
+  client.spotify.start({
+    onEvent: (event) => {
+      const owner = client.engineOwner;
+      const player = owner ? client.players.get(owner) : null;
+      if (!player) return;
+      Promise.resolve(player.handleEngineEvent(event)).catch((error) => {
+        logError("spotify:event", error, { type: event?.type });
       });
-    }
-    if (packet.t === "VOICE_SERVER_UPDATE") {
-      debug("rawVoiceServer", {
-        guildId: packet.d.guild_id,
-        endpoint: packet.d.endpoint,
-      });
-    }
+    },
+    onPcm: (chunk) => {
+      const owner = client.engineOwner;
+      client.players.get(owner)?.writePcm(chunk);
+    },
+    onDiscontinuity: () => {
+      const owner = client.engineOwner;
+      client.players.get(owner)?.onDiscontinuity();
+    },
   });
 
   try {
@@ -68,7 +37,7 @@ export async function execute(readyClient, client) {
 
   log(
     "ready",
-    `Logged in as ${readyClient.user.tag} | Lavalink ${config.lavalink.host}:${config.lavalink.port} | guilds=${client.guilds.cache.size}`,
+    `Logged in as ${readyClient.user.tag} | Spotify ${config.spotify.engineUrl} | guilds=${client.guilds.cache.size}`,
   );
 
   if (client.guilds.cache.size === 0) {

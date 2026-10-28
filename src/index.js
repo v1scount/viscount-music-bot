@@ -51,26 +51,6 @@ async function loadEvents() {
   console.log(`[events] Loaded ${files.length} Discord event(s)`);
 }
 
-async function loadPoruEvents() {
-  const poruDir = path.join(__dirname, "events", "poru");
-  const files = (await readdir(poruDir)).filter((f) => f.endsWith(".js"));
-
-  for (const file of files) {
-    const event = await import(pathToFileURL(path.join(poruDir, file)).href);
-    if (!event?.name || typeof event.execute !== "function") {
-      console.warn(`[poru] Skipping invalid event file: ${file}`);
-      continue;
-    }
-    client.poru.on(event.name, (...args) => {
-      Promise.resolve(event.execute(...args, client)).catch((error) => {
-        console.error(`[poru:${event.name}]`, error);
-      });
-    });
-  }
-
-  console.log(`[poru] Loaded ${files.length} Poru event(s)`);
-}
-
 async function shutdown(signal) {
   if (shuttingDown) return;
   shuttingDown = true;
@@ -84,12 +64,18 @@ async function shutdown(signal) {
     logError("shutdown:flush", error);
   }
 
-  for (const player of [...client.poru.players.values()]) {
+  for (const player of [...client.players.values()]) {
     try {
       await player.destroy();
     } catch (error) {
       logError("shutdown:destroy", error, { guildId: player.guildId });
     }
+  }
+
+  try {
+    await client.spotify.stop();
+  } catch (error) {
+    logError("shutdown:spotify", error);
   }
 
   try {
@@ -104,7 +90,6 @@ async function shutdown(signal) {
 async function main() {
   await loadCommands();
   await loadEvents();
-  await loadPoruEvents();
 
   process.on("unhandledRejection", (error) => {
     console.error("[unhandledRejection]", error);

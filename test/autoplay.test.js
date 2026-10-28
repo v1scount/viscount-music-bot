@@ -1,39 +1,48 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {
-  buildYoutubeMixUrl,
-  findAutoplayTrack,
-} from "../src/services/autoplay.js";
+import { findAutoplayTrack } from "../src/services/autoplay.js";
 
-function track(identifier, sourceName, author, title) {
+function track(identifier, author, title) {
   return {
-    info: { identifier, sourceName, author, title },
+    info: {
+      identifier,
+      uri: `spotify:track:${identifier}`,
+      sourceName: "spotify",
+      author,
+      title,
+    },
   };
 }
 
-test("buildYoutubeMixUrl uses the YouTube radio playlist", () => {
-  assert.equal(
-    buildYoutubeMixUrl("abc123"),
-    "https://www.youtube.com/watch?v=abc123&list=RDabc123",
+test("autoplay picks a radio track that was not played recently", async () => {
+  const seed = track("seed", "Seed Artist", "Seed Song");
+  const recent = track("old", "Other", "Old");
+  const next = track("next", "Other", "Next Song");
+  const client = {
+    spotify: {
+      async radio(uri) {
+        assert.equal(uri, "spotify:track:seed");
+        return { tracks: [seed, recent, next] };
+      },
+    },
+  };
+
+  const result = await findAutoplayTrack(
+    client,
+    { previousTrack: null },
+    { lastTrack: seed, recentTrackKeys: ["old", "other:old"] },
+    () => 0,
   );
+
+  assert.equal(result.info.uri, "spotify:track:next");
 });
 
-test("autoplay converts non-YouTube seeds before loading a mix", async () => {
-  const seed = track("spotify-id", "spotify", "Seed Artist", "Seed Song");
-  const youtubeSeed = track("youtube-seed", "youtube", "Seed Artist", "Seed Song");
-  const recommendation = track("recommended", "youtube", "Other", "Next Song");
-  const queries = [];
+test("autoplay returns null when radio has nothing new", async () => {
+  const seed = track("seed", "Seed Artist", "Seed Song");
   const client = {
-    poru: {
-      async resolve(options) {
-        queries.push(options);
-        if (options.source === "ytmsearch") {
-          return { loadType: "search", tracks: [youtubeSeed] };
-        }
-        return {
-          loadType: "playlist",
-          tracks: [youtubeSeed, recommendation],
-        };
+    spotify: {
+      async radio() {
+        return { tracks: [seed] };
       },
     },
   };
@@ -45,7 +54,5 @@ test("autoplay converts non-YouTube seeds before loading a mix", async () => {
     () => 0,
   );
 
-  assert.equal(result, recommendation);
-  assert.equal(queries[0].source, "ytmsearch");
-  assert.match(queries[1].query, /list=RDyoutube-seed/);
+  assert.equal(result, null);
 });

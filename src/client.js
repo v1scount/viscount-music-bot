@@ -4,8 +4,8 @@ import {
   GatewayIntentBits,
   Partials,
 } from "discord.js";
-import { Poru } from "poru";
 import { config } from "./config.js";
+import { SpotifyClient } from "./services/spotifyClient.js";
 
 export class MusicBot extends Client {
   constructor() {
@@ -19,25 +19,10 @@ export class MusicBot extends Client {
     });
 
     this.commands = new Collection();
-
-    this.poru = new Poru(
-      this,
-      [
-        {
-          name: config.lavalink.name,
-          host: config.lavalink.host,
-          port: config.lavalink.port,
-          password: config.lavalink.password,
-          secure: config.lavalink.secure,
-        },
-      ],
-      {
-        library: "discord.js",
-        defaultPlatform: "ytsearch",
-        autoResume: true,
-        reconnectTimeout: 3000,
-        reconnectTries: 50,
-      },
-    );
+    /** @type {Map<string, import("./player/guildPlayer.js").GuildPlayer>} */
+    this.players = new Map();
+    /** Guild currently holding the single Spotify stream. */
+    this.engineOwner = null;
+    this.spotify = new SpotifyClient(config.spotify);
   }
 }

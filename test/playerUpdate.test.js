@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   shouldRefreshPanel,
   PANEL_THROTTLE_MS,
-} from "../src/events/poru/playerUpdate.js";
+} from "../src/utils/playerUpdate.js";
 
 test("shouldRefreshPanel skips paused players", () => {
   assert.equal(

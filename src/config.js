@@ -15,12 +15,10 @@ export const config = {
     clientId: required("DISCORD_CLIENT_ID"),
     guildId: process.env.DISCORD_GUILD_ID || null,
   },
-  lavalink: {
-    name: "main",
-    host: process.env.LAVALINK_HOST || "lavalink",
-    port: Number(process.env.LAVALINK_PORT || 2333),
-    password: required("LAVALINK_PASSWORD"),
-    secure: false,
+  spotify: {
+    engineUrl: process.env.SPOTIFY_ENGINE_URL || "http://127.0.0.1:8090",
+    pcmHost: process.env.SPOTIFY_PCM_HOST || "127.0.0.1",
+    pcmPort: Number(process.env.SPOTIFY_PCM_PORT || 8091),
   },
   /** Persisted player sessions (JSON file). Docker sets DATA_PATH=/app/data/sessions.json. */
   dataPath:
