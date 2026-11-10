@@ -426,13 +426,40 @@ async fn resolve_route(
     Ok(Json(resolve(&session, &query.uri).await?))
 }
 
+#[derive(Deserialize)]
+struct RadioQuery {
+    uri: String,
+    #[serde(default)]
+    previous: String,
+    #[serde(default)]
+    artists: String,
+    #[serde(default)]
+    step: usize,
+}
+
 async fn radio_route(
     State(app): State<Arc<App>>,
-    Query(query): Query<UriQuery>,
+    Query(query): Query<RadioQuery>,
 ) -> Result<Json<ResolveJson>, ApiError> {
     ensure_session(&app).await?;
     let session = app.session.read().await.clone();
-    Ok(Json(radio(&session, &query.uri).await?))
+    let previous: Vec<String> = query
+        .previous
+        .split(',')
+        .map(str::trim)
+        .filter(|uri| !uri.is_empty())
+        .map(str::to_string)
+        .collect();
+    let artists: Vec<String> = query
+        .artists
+        .split(',')
+        .map(str::trim)
+        .filter(|id| !id.is_empty())
+        .map(str::to_string)
+        .collect();
+    Ok(Json(
+        radio(&session, &query.uri, &previous, &artists, query.step).await?,
+    ))
 }
 
 #[derive(Deserialize)]

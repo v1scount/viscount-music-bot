@@ -13,7 +13,11 @@ import { refreshIdleTimer } from "../services/idleLeave.js";
 import { logError } from "../utils/logger.js";
 import { sendPlayerMessage } from "../utils/playerMessage.js";
 import { updatePlayerPanel } from "../utils/playerPanel.js";
-import { getPlayerState, rememberTrack } from "../utils/playerState.js";
+import {
+  getPlayerState,
+  noteStationTrack,
+  rememberTrack,
+} from "../utils/playerState.js";
 import { shouldRefreshPanel } from "../utils/playerUpdate.js";
 import { PcmFeed } from "./pcmFeed.js";
 
@@ -378,6 +382,7 @@ export class GuildPlayer {
     this.unavailableRetries = 0;
     state.lastTrack = track;
     rememberTrack(state, track);
+    noteStationTrack(state, track);
     await updatePlayerPanel(this.client, this);
     refreshIdleTimer(this.client, this);
   }

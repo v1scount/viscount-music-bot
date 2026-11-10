@@ -64,7 +64,7 @@ Panel **Stop** matches `/stop`: it clears the queue, deletes the bot’s message
 
 ## Autoplay
 
-Autoplay is enabled by default. When the manual queue ends, the bot asks Spotify for radio based on the last track. Recently played tracks are excluded, and manually queued tracks always take priority.
+Autoplay is enabled by default. It plays one more song by the artist you requested, then a different related artist each time. Recently played tracks are excluded, and manually queued tracks always take priority.
 
 Use `/autoplay enabled:false` or the panel button to disable it for a server.
 

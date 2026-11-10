@@ -2,7 +2,11 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { config } from "../config.js";
 import { debug, log, logError } from "../utils/logger.js";
-import { getPlayerState } from "../utils/playerState.js";
+import {
+  ARTIST_COOLDOWN,
+  RECENT_URI_LIMIT,
+  getPlayerState,
+} from "../utils/playerState.js";
 import {
   ensurePlayer,
   waitForVoiceConnection,
@@ -21,6 +25,21 @@ function isSpotifyTrack(track) {
 }
 
 /**
+ * @param {unknown} value
+ */
+function stationArtistId(value) {
+  return typeof value === "string" && /^[0-9A-Za-z]{22}$/.test(value) ? value : null;
+}
+
+/**
+ * @param {unknown} value
+ */
+function stationArtistIds(value) {
+  if (!Array.isArray(value)) return [];
+  return value.map(stationArtistId).filter(Boolean).slice(-ARTIST_COOLDOWN);
+}
+
+/**
  * @param {{ info?: object } | null | undefined} track
  */
 export function serializeTrack(track) {
@@ -30,6 +49,7 @@ export function serializeTrack(track) {
       identifier: track.info.identifier,
       isSeekable: track.info.isSeekable,
       author: track.info.author,
+      artistId: stationArtistId(track.info.artistId),
       length: track.info.length,
       isStream: track.info.isStream,
       position: track.info.position ?? 0,
@@ -82,6 +102,14 @@ export function collectSessions(client) {
       current: serializeTrack(player.currentTrack),
       queue: player.queue.map((track) => serializeTrack(track)).filter(Boolean),
       recentTrackKeys: state.recentTrackKeys ?? [],
+      recentTrackUris: Array.isArray(state.recentTrackUris)
+        ? state.recentTrackUris
+            .filter((uri) => typeof uri === "string" && uri.startsWith("spotify:track:"))
+            .slice(-RECENT_URI_LIMIT)
+        : [],
+      recentArtistIds: stationArtistIds(state.recentArtistIds),
+      autoplaySeed: serializeTrack(state.autoplaySeed),
+      autoplayCount: stationCount(state.autoplayCount),
     };
   }
 
@@ -193,6 +221,27 @@ export async function restoreSessions(client) {
 }
 
 /**
+ * @param {ReturnType<typeof getPlayerState>} state
+ * @param {object | null | undefined} session
+ */
+export function restoreStationFields(state, session) {
+  state.autoplaySeed = session?.autoplaySeed
+    ? deserializeTrack(session.autoplaySeed)
+    : null;
+  const uris = Array.isArray(session?.recentTrackUris) ? session.recentTrackUris : [];
+  state.recentTrackUris = uris
+    .filter((uri) => typeof uri === "string" && uri.startsWith("spotify:track:"))
+    .slice(-RECENT_URI_LIMIT);
+  state.recentArtistIds = stationArtistIds(session?.recentArtistIds);
+  state.autoplayCount = stationCount(session?.autoplayCount);
+}
+
+function stationCount(value) {
+  const count = Number(value);
+  return Number.isInteger(count) && count >= 0 ? count : 0;
+}
+
+/**
  * @param {import("../client.js").MusicBot} client
  * @param {string} guildId
  * @param {object} session
@@ -229,6 +278,7 @@ async function restoreGuildSession(client, guildId, session) {
   state.recentTrackKeys = Array.isArray(session.recentTrackKeys)
     ? session.recentTrackKeys
     : [];
+  restoreStationFields(state, session);
   state.panelMessageId = null;
   state.panelChannelId = session.textChannelId ?? null;
   state.panelMessage = null;

@@ -8,34 +8,36 @@ function isRecent(state, track) {
 /**
  * @param {import("../client.js").MusicBot} client
  * @param {{ previousTrack?: object | null }} player
- * @param {{ lastTrack?: object | null, recentTrackKeys?: string[] }} state
- * @param {() => number} [random]
+ * @param {{ autoplaySeed?: object | null, autoplayCount?: number, lastTrack?: object | null, recentArtistIds?: string[], recentTrackKeys?: string[], recentTrackUris?: string[] }} state
  */
-export async function findAutoplayTrack(client, player, state, random = Math.random) {
-  const seed = state.lastTrack ?? player.previousTrack;
-  const uri = seed?.info?.uri;
-  if (!uri?.startsWith("spotify:track:")) return null;
+export async function findAutoplayTrack(client, player, state) {
+  const anchor = state.autoplaySeed ?? state.lastTrack ?? player.previousTrack;
+  const anchorUri = anchor?.info?.uri;
+  if (!anchorUri?.startsWith("spotify:track:")) return null;
+
+  const previous = Array.isArray(state.recentTrackUris) ? state.recentTrackUris : [];
+  const artists = Array.isArray(state.recentArtistIds) ? state.recentArtistIds : [];
+  const step = state.autoplayCount ?? 0;
 
   let result;
   try {
-    result = await client.spotify.radio(uri);
+    result = await client.spotify.radio(anchorUri, previous, step, artists);
   } catch (error) {
     logError("autoplay:radio", error, {
-      title: seed.info?.title,
-      artist: seed.info?.author,
+      title: anchor.info?.title,
+      artist: anchor.info?.author,
     });
     return null;
   }
 
   const candidates = (result.tracks ?? []).filter((track) => {
-    if (!track?.info?.uri || track.info.uri === uri) return false;
-    if (track.info.identifier && track.info.identifier === seed.info?.identifier) {
+    if (!track?.info?.uri || track.info.uri === anchorUri) return false;
+    if (track.info.identifier && track.info.identifier === anchor.info?.identifier) {
       return false;
     }
     return !isRecent(state, track);
   });
-  if (candidates.length === 0) return null;
-  return candidates[Math.floor(random() * candidates.length)];
+  return candidates[0] ?? null;
 }
 
 /**

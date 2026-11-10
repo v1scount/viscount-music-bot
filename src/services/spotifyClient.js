@@ -13,6 +13,7 @@ function toTrack(body) {
       identifier: body.identifier,
       isSeekable: body.isSeekable !== false,
       author: body.author ?? "Unknown",
+      artistId: typeof body.artistId === "string" ? body.artistId : null,
       length: Number(body.length) || 0,
       isStream: Boolean(body.isStream),
       position: 0,
@@ -101,10 +102,29 @@ export class SpotifyClient {
 
   /**
    * @param {string} uri
+   * @param {string[]} [previous]
+   * @param {number} [step]
+   * @param {string[]} [artists]
    */
-  async radio(uri) {
+  async radio(uri, previous = [], step = 0, artists = []) {
     const url = new URL(`${this.engineUrl}/radio`);
     url.searchParams.set("uri", uri);
+    const uris = (Array.isArray(previous) ? previous : []).filter(
+      (item) => typeof item === "string" && item.startsWith("spotify:track:"),
+    );
+    if (uris.length > 0) {
+      url.searchParams.set("previous", uris.join(","));
+    }
+    const rotationStep = Number(step);
+    if (Number.isInteger(rotationStep) && rotationStep >= 0) {
+      url.searchParams.set("step", String(rotationStep));
+    }
+    const artistIds = (Array.isArray(artists) ? artists : []).filter(
+      (item) => typeof item === "string" && /^[0-9A-Za-z]{22}$/.test(item),
+    );
+    if (artistIds.length > 0) {
+      url.searchParams.set("artists", artistIds.join(","));
+    }
     return toResolveResult(await this.getJson(url, 8000));
   }
 
