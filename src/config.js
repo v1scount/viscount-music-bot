@@ -20,6 +20,10 @@ export const config = {
     pcmHost: process.env.SPOTIFY_PCM_HOST || "127.0.0.1",
     pcmPort: Number(process.env.SPOTIFY_PCM_PORT || 8091),
   },
+  soloist: {
+    url: process.env.SOLOIST_WS_URL || "",
+    harvestTimeoutMs: Number(process.env.SOLOIST_HARVEST_TIMEOUT_MS || 8000),
+  },
   /** Persisted player sessions (JSON file). Docker sets DATA_PATH=/app/data/sessions.json. */
   dataPath:
     process.env.DATA_PATH || path.join(process.cwd(), "data", "sessions.json"),

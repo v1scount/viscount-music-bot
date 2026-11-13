@@ -7,6 +7,7 @@ function createState() {
     lastPanelUpdateAt: 0,
     autoplayCount: 0,
     autoplaySeed: null,
+    soloistRecommendations: null,
     lastTrack: null,
     panelChannelId: null,
     panelMessage: null,
@@ -84,6 +85,7 @@ export function noteStationTrack(state, track) {
       state.recentTrackUris = [];
       state.recentArtistIds = [];
       state.autoplayCount = 0;
+      state.soloistRecommendations = null;
     }
     return;
   }
@@ -107,6 +109,7 @@ export function noteStationTrack(state, track) {
   state.autoplaySeed = track;
   state.recentTrackUris = [uri];
   state.autoplayCount = 0;
+  state.soloistRecommendations = null;
   state.recentArtistIds = artistId ? [artistId] : [];
 }
 

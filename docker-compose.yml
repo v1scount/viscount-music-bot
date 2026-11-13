@@ -20,12 +20,46 @@ services:
       - "127.0.0.1:8091:8091"
       - "127.0.0.1:8898:8899"
 
+  soloist:
+    build: ./soloist
+    container_name: music-bot-soloist
+    restart: unless-stopped
+    environment:
+      SOLOIST_API_KEY: ${SOLOIST_API_KEY:-}
+      SOLOIST_DEVICE_NAME: ${SOLOIST_DEVICE_NAME:-music-bot}
+      SOLOIST_PIPEWIRE_DEVICE: soloist-null
+      SOLOIST_WS_PORT: 9090
+    volumes:
+      - soloist-data:/data
+      - soloist-cache:/cache
+    networks:
+      - music-bot
+
+  # One-off pairing. Host networking advertises a Docker bridge address, which
+  # phones on the LAN cannot reach, so the Spotify app hides the device.
+  soloist-pair:
+    profiles: ["pair"]
+    build: ./soloist
+    dns:
+      - ${SOLOIST_LAN_GATEWAY:-192.168.100.1}
+    networks:
+      lan:
+        ipv4_address: ${SOLOIST_LAN_ADDRESS:-192.168.100.50}
+    environment:
+      SOLOIST_API_KEY: ${SOLOIST_API_KEY:-}
+      SOLOIST_DEVICE_NAME: ${SOLOIST_DEVICE_NAME:-music-bot}
+    volumes:
+      - soloist-data:/data
+      - soloist-cache:/cache
+    command: ["pair"]
+
   bot:
     build: .
     container_name: music-bot
     restart: unless-stopped
     depends_on:
       - spotify-engine
+      - soloist
     environment:
       DISCORD_TOKEN: ${DISCORD_TOKEN}
       DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
@@ -33,6 +67,8 @@ services:
       SPOTIFY_ENGINE_URL: http://spotify-engine:8090
       SPOTIFY_PCM_HOST: spotify-engine
       SPOTIFY_PCM_PORT: 8091
+      SOLOIST_WS_URL: ${SOLOIST_WS_URL:-ws://soloist:9090}
+      SOLOIST_HARVEST_TIMEOUT_MS: ${SOLOIST_HARVEST_TIMEOUT_MS:-8000}
       DEBUG: ${DEBUG:-false}
       DATA_PATH: /app/data/sessions.json
       IDLE_LEAVE_MS: ${IDLE_LEAVE_MS:-300000}
@@ -44,7 +80,18 @@ services:
 volumes:
   spotify-cache:
   bot-data:
+  soloist-data:
+  soloist-cache:
 
 networks:
   music-bot:
     driver: bridge
+  lan:
+    driver: macvlan
+    driver_opts:
+      parent: ${SOLOIST_LAN_PARENT:-enp4s0}
+    ipam:
+      config:
+        - subnet: ${SOLOIST_LAN_SUBNET:-192.168.100.0/24}
+          gateway: ${SOLOIST_LAN_GATEWAY:-192.168.100.1}
+          ip_range: ${SOLOIST_LAN_ADDRESS:-192.168.100.50}/32

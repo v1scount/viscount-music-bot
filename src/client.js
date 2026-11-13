@@ -5,6 +5,7 @@ import {
   Partials,
 } from "discord.js";
 import { config } from "./config.js";
+import { SoloistClient } from "./services/soloistClient.js";
 import { SpotifyClient } from "./services/spotifyClient.js";
 
 export class MusicBot extends Client {
@@ -24,5 +25,6 @@ export class MusicBot extends Client {
     /** Guild currently holding the single Spotify stream. */
     this.engineOwner = null;
     this.spotify = new SpotifyClient(config.spotify);
+    this.soloist = new SoloistClient(config.soloist);
   }
 }

@@ -11,6 +11,7 @@ import {
   streamBusyMessage,
   waitForVoiceConnection,
 } from "../utils/voiceConnection.js";
+import { dropQueuedAutoplay } from "../services/autoplay.js";
 import { refreshIdleTimer } from "../services/idleLeave.js";
 
 const AUTOCOMPLETE_SEARCH_TIMEOUT_MS = 2200;
@@ -320,6 +321,7 @@ export async function execute(interaction, client) {
   const tracks =
     result.loadType === "playlist" ? result.tracks : result.tracks.slice(0, 1);
 
+  dropQueuedAutoplay(player.queue);
   for (const track of tracks) {
     track.info.requester = interaction.user;
     player.queue.add(track);
