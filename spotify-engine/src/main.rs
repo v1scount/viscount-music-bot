@@ -539,7 +539,7 @@ impl From<anyhow::Error> for ApiError {
 
 impl IntoResponse for ApiError {
     fn into_response(self) -> axum::response::Response {
-        let message = self.0.to_string();
+        let message = format!("{:#}", self.0);
         error!("api: {message}");
         (
             StatusCode::BAD_GATEWAY,

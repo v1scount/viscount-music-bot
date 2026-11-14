@@ -73,8 +73,33 @@ pub fn normalize_input(input: &str) -> Result<SpotifyUri> {
     SpotifyUri::from_uri(&format!("spotify:{kind}:{id}")).context("invalid spotify id")
 }
 
+/// Spotify search URIs keep spaces as `+` and percent-encode every other
+/// non-ASCII character. A raw Unicode query makes context resolve fail.
+fn search_query(query: &str) -> String {
+    let collapsed = query.split_whitespace().collect::<Vec<_>>().join(" ");
+    let mut encoded = String::new();
+    let mut bytes = [0u8; 4];
+    for ch in collapsed.chars() {
+        if ch == ' ' {
+            encoded.push('+');
+            continue;
+        }
+        if ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.' | '~' | ':') {
+            encoded.push(ch);
+            continue;
+        }
+        let utf8 = ch.encode_utf8(&mut bytes);
+        for byte in utf8.as_bytes() {
+            encoded.push('%');
+            encoded.push(char::from(b"0123456789ABCDEF"[(byte >> 4) as usize]));
+            encoded.push(char::from(b"0123456789ABCDEF"[(byte & 0x0f) as usize]));
+        }
+    }
+    encoded
+}
+
 pub async fn search(session: &Session, query: &str) -> Result<ResolveJson> {
-    let q = query.split_whitespace().collect::<Vec<_>>().join("+");
+    let q = search_query(query);
     if q.is_empty() {
         return Ok(empty("empty"));
     }
@@ -82,7 +107,7 @@ pub async fn search(session: &Session, query: &str) -> Result<ResolveJson> {
         .spclient()
         .get_context(&format!("spotify:search:{q}"))
         .await
-        .context("search")?;
+        .with_context(|| format!("search {query}"))?;
     let uris = track_uris(&ctx);
     let tracks = hydrate_all(session, &uris, SEARCH_LIMIT).await;
     if tracks.is_empty() {
@@ -901,5 +926,14 @@ mod tests {
         let kept = drop_cooled_artists(only, &cooled);
         assert_eq!(kept.len(), 1);
         assert_eq!(kept[0].artist_id.as_deref(), Some(aid(0).as_str()));
+    }
+
+    #[test]
+    fn search_query_percent_encodes_unicode_and_joins_words_with_plus() {
+        assert_eq!(search_query("Hard  To Explain"), "Hard+To+Explain");
+        assert_eq!(
+            search_query("Sweet Alley 恋バースト"),
+            "Sweet+Alley+%E6%81%8B%E3%83%90%E3%83%BC%E3%82%B9%E3%83%88"
+        );
     }
 }

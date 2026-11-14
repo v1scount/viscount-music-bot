@@ -12,7 +12,7 @@ librespot is an unofficial client. Spotify's terms forbid that, and free account
 
 ## Setup
 
-1. Copy `.env.example` to `.env` and fill in Discord plus the Premium account.
+1. Copy `.env.example` to `.env` and fill in Discord, the Premium account, and `FREQBLOG_API_KEY`.
 2. Start everything:
 
 ```bash
@@ -52,7 +52,7 @@ If the bot is alone in a voice channel for `IDLE_LEAVE_MS` (default `300000` / 5
 | `/remove position` | Remove an upcoming track |
 | `/move from to` | Reorder an upcoming track |
 | `/clear` | Clear upcoming tracks without stopping |
-| `/autoplay enabled` | Toggle Spotify radio autoplay |
+| `/autoplay enabled` | Toggle similar-track autoplay |
 
 YouTube and other non-Spotify links are declined.
 
@@ -64,7 +64,9 @@ Panel **Stop** matches `/stop`: it clears the queue, deletes the bot’s message
 
 ## Autoplay
 
-Autoplay is enabled by default. It plays one more song by the artist you requested, then a different related artist each time. Recently played tracks are excluded, and manually queued tracks always take priority.
+Autoplay is enabled by default. When the queue runs out, the bot asks [FreqBlog](https://freqblog.com/#docs) for other artists in that song's genre that have actually charted. A song by the artist you played can still come up, but it does not take over the queue. Only the closest of those matches are kept, and they are queued together so the now-playing message keeps showing what is next. The station does not start a new search from a later song. A track that cannot be looked up is skipped. The request is a single API call (`GET /similar`, `cross_genre=strict`, `charted=true`, `min_chart_peak=40`). The result is cached on disk, and another call is made only after those tracks have been used. Songs already played are skipped, and anything queued by hand plays first.
+
+The free plan includes 1,000 calls per month. Leave `FREQBLOG_API_KEY` empty and autoplay stays off until you set it.
 
 Use `/autoplay enabled:false` or the panel button to disable it for a server.
 

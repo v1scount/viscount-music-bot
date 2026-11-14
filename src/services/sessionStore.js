@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { config } from "../config.js";
+import { AUTOPLAY_QUERY, sanitizeFetchedKeys, sanitizeRadioBuffer } from "./freqblog.js";
 import { debug, log, logError } from "../utils/logger.js";
 import {
   ARTIST_COOLDOWN,
@@ -110,6 +111,9 @@ export function collectSessions(client) {
       recentArtistIds: stationArtistIds(state.recentArtistIds),
       autoplaySeed: serializeTrack(state.autoplaySeed),
       autoplayCount: stationCount(state.autoplayCount),
+      autoplayBuffer: sanitizeRadioBuffer(state.autoplayBuffer),
+      autoplayFetchedKeys: sanitizeFetchedKeys(state.autoplayFetchedKeys),
+      autoplayQuery: AUTOPLAY_QUERY,
     };
   }
 
@@ -234,6 +238,9 @@ export function restoreStationFields(state, session) {
     .slice(-RECENT_URI_LIMIT);
   state.recentArtistIds = stationArtistIds(session?.recentArtistIds);
   state.autoplayCount = stationCount(session?.autoplayCount);
+  const sameQuery = session?.autoplayQuery === AUTOPLAY_QUERY;
+  state.autoplayBuffer = sameQuery ? sanitizeRadioBuffer(session?.autoplayBuffer) : [];
+  state.autoplayFetchedKeys = sameQuery ? sanitizeFetchedKeys(session?.autoplayFetchedKeys) : [];
 }
 
 function stationCount(value) {

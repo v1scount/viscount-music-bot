@@ -9,6 +9,8 @@ function required(name) {
   return value;
 }
 
+const dataPath = process.env.DATA_PATH || path.join(process.cwd(), "data", "sessions.json");
+
 export const config = {
   discord: {
     token: required("DISCORD_TOKEN"),
@@ -20,9 +22,14 @@ export const config = {
     pcmHost: process.env.SPOTIFY_PCM_HOST || "127.0.0.1",
     pcmPort: Number(process.env.SPOTIFY_PCM_PORT || 8091),
   },
+  freqblog: {
+    apiUrl: process.env.FREQBLOG_API_URL || "https://api.freqblog.com",
+    apiKey: process.env.FREQBLOG_API_KEY || "",
+    cachePath:
+      process.env.FREQBLOG_CACHE_PATH || path.join(path.dirname(dataPath), "freqblog-radio.json"),
+  },
   /** Persisted player sessions (JSON file). Docker sets DATA_PATH=/app/data/sessions.json. */
-  dataPath:
-    process.env.DATA_PATH || path.join(process.cwd(), "data", "sessions.json"),
+  dataPath,
   /** Leave voice when alone for this long (default 5 minutes). */
   idleLeaveMs: Number(process.env.IDLE_LEAVE_MS || 300_000),
 };

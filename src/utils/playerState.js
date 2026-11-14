@@ -7,6 +7,8 @@ function createState() {
     lastPanelUpdateAt: 0,
     autoplayCount: 0,
     autoplaySeed: null,
+    autoplayBuffer: [],
+    autoplayFetchedKeys: [],
     lastTrack: null,
     panelChannelId: null,
     panelMessage: null,
@@ -69,7 +71,7 @@ function stationArtistId(value) {
 }
 
 /**
- * A requested track becomes the station anchor and starts a new rotation.
+ * A requested track becomes the station anchor and drops the cached radio list.
  * Autoplay tracks advance the count and remember who just played.
  *
  * @param {ReturnType<typeof createState>} state
@@ -84,6 +86,8 @@ export function noteStationTrack(state, track) {
       state.recentTrackUris = [];
       state.recentArtistIds = [];
       state.autoplayCount = 0;
+      state.autoplayBuffer = [];
+      state.autoplayFetchedKeys = [];
     }
     return;
   }
@@ -108,6 +112,8 @@ export function noteStationTrack(state, track) {
   state.recentTrackUris = [uri];
   state.autoplayCount = 0;
   state.recentArtistIds = artistId ? [artistId] : [];
+  state.autoplayBuffer = [];
+  state.autoplayFetchedKeys = [];
 }
 
 export function rememberTrack(state, track, limit = 20) {

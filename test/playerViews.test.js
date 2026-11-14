@@ -47,7 +47,8 @@ test("player panel exposes playback controls", () => {
   assert.equal(payload.embeds.length, 1);
   assert.equal(embed.color, colors.active);
   assert.equal(embed.image?.url, "https://example.com/art.jpg");
-  assert.match(embed.description, /Up next/);
+  assert.match(embed.description, /Up next · \*\*Track 2\*\*/);
+  assert.match(embed.description, /· \*\*Track 3\*\*/);
   assert.match(embed.description, /Source · Youtube/);
   assert.equal(json.length, 1);
   assert.equal(json[0].components.length, 4);

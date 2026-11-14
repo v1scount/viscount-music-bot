@@ -7,6 +7,7 @@ import {
   collectSessions,
   restoreStationFields,
 } from "../src/services/sessionStore.js";
+import { AUTOPLAY_QUERY } from "../src/services/freqblog.js";
 import { getPlayerState } from "../src/utils/playerState.js";
 
 function createTrack(title = "Song") {
@@ -82,6 +83,11 @@ test("collectSessions captures active guild players", () => {
   state.recentArtistIds = ["a".repeat(22), "b".repeat(22), "c".repeat(22), "d".repeat(22), "nope"];
   state.autoplaySeed = createTrack("Anchor");
   state.autoplayCount = 4;
+  state.autoplayBuffer = [
+    { id: "9", title: "Kept", artist: "Other", isrc: "USUM71500001" },
+    { title: "", artist: "Nope" },
+  ];
+  state.autoplayFetchedKeys = ["isrc:USUM71500001", 12, "name:other|kept"];
 
   const sessions = collectSessions(client);
   assert.ok(sessions["guild-1"]);
@@ -100,6 +106,14 @@ test("collectSessions captures active guild players", () => {
   ]);
   assert.equal(sessions["guild-1"].autoplaySeed.info.title, "Anchor");
   assert.equal(sessions["guild-1"].autoplayCount, 4);
+  assert.deepEqual(sessions["guild-1"].autoplayBuffer, [
+    { id: "9", title: "Kept", artist: "Other", isrc: "USUM71500001" },
+  ]);
+  assert.deepEqual(sessions["guild-1"].autoplayFetchedKeys, [
+    "isrc:USUM71500001",
+    "name:other|kept",
+  ]);
+  assert.equal(sessions["guild-1"].autoplayQuery, AUTOPLAY_QUERY);
   assert.equal("panelMessageId" in sessions["guild-1"], false);
 });
 
@@ -110,9 +124,14 @@ test("restoreStationFields keeps a saved anchor and ignores older files", () => 
     recentTrackUris: ["spotify:track:abc123", "https://youtu.be/nope", "spotify:track:def456"],
     recentArtistIds: ["a".repeat(22), "nope", "b".repeat(22)],
     autoplayCount: 4,
+    autoplayBuffer: [{ id: "9", title: "Kept", artist: "Other", isrc: "usum71500001" }],
+    autoplayFetchedKeys: ["name:other|kept"],
+    autoplayQuery: AUTOPLAY_QUERY,
   });
   assert.equal(state.autoplaySeed.info.uri, "spotify:track:abc123");
   assert.equal(state.autoplayCount, 4);
+  assert.equal(state.autoplayBuffer[0].isrc, "USUM71500001");
+  assert.deepEqual(state.autoplayFetchedKeys, ["name:other|kept"]);
   assert.deepEqual(state.recentTrackUris, [
     "spotify:track:abc123",
     "spotify:track:def456",
@@ -125,4 +144,15 @@ test("restoreStationFields keeps a saved anchor and ignores older files", () => 
   assert.deepEqual(legacy.recentTrackUris, []);
   assert.deepEqual(legacy.recentArtistIds, []);
   assert.equal(legacy.autoplayCount, 0);
+  assert.deepEqual(legacy.autoplayBuffer, []);
+  assert.deepEqual(legacy.autoplayFetchedKeys, []);
+
+  const stale = getPlayerState({}, "restore-stale-query");
+  restoreStationFields(stale, {
+    autoplayBuffer: [{ id: "1", title: "Old Walk", artist: "Other", isrc: null }],
+    autoplayFetchedKeys: ["isrc:USUM71500001"],
+    autoplayQuery: "radio",
+  });
+  assert.deepEqual(stale.autoplayBuffer, []);
+  assert.deepEqual(stale.autoplayFetchedKeys, []);
 });
