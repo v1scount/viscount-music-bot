@@ -55,7 +55,7 @@ export function buildPlayerPanel(player, state, { disabled = false } = {}) {
   const position = active ? player.position ?? 0 : 0;
   const duration = track?.info?.length ?? 0;
   const showPlay = Boolean(player?.isPaused);
-  const next = player?.queue?.[0];
+  const upcoming = Array.isArray(player?.queue) ? player.queue.slice(0, 4) : [];
 
   const descriptionParts = [];
   if (track) {
@@ -67,8 +67,13 @@ export function buildPlayerPanel(player, state, { disabled = false } = {}) {
   } else {
     descriptionParts.push("Nothing is playing.");
   }
-  if (next) {
-    descriptionParts.push("", `Up next · **${next.info.title}** — ${next.info.author}`);
+  if (upcoming.length > 0) {
+    const lines = upcoming.map((item, index) =>
+      index === 0
+        ? `Up next · **${item.info.title}** — ${item.info.author}`
+        : `· **${item.info.title}** — ${item.info.author}`,
+    );
+    descriptionParts.push("", ...lines);
   }
 
   const embed = new EmbedBuilder()

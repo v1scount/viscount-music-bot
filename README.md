@@ -52,7 +52,7 @@ If the bot is alone in a voice channel for `IDLE_LEAVE_MS` (default `300000` / 5
 | `/remove position` | Remove an upcoming track |
 | `/move from to` | Reorder an upcoming track |
 | `/clear` | Clear upcoming tracks without stopping |
-| `/autoplay enabled` | Toggle Spotify radio autoplay |
+| `/autoplay enabled` | Toggle ReccoBeats recommendation autoplay |
 
 YouTube and other non-Spotify links are declined.
 
@@ -64,7 +64,22 @@ Panel **Stop** matches `/stop`: it clears the queue, deletes the bot’s message
 
 ## Autoplay
 
-Autoplay is enabled by default. It plays one more song by the artist you requested, then a different related artist each time. Recently played tracks are excluded, and manually queued tracks always take priority.
+Autoplay is enabled by default. When the queue runs out, the bot asks
+[ReccoBeats](https://reccobeats.com/docs/apis/get-recommendation) for tracks
+similar to the song the listener originally requested. That anchor stays fixed,
+so recommendations do not drift from one autoplay track to the next.
+
+The seed track's Spotify popularity is sent as an explicit recommendation
+target. Results more than 10 popularity points away are discarded and the
+closest results are queued first. This keeps mainstream tracks with similarly
+popular tracks and niche tracks with similarly sized audiences; ReccoBeats does
+not expose raw reproduction counts, so Spotify popularity is the available
+proxy. Other artists lead the buffer, and the seed artist returns about once
+every four songs. If that first list is still mostly the seed artist, one
+follow-up request excludes them so the station can fill with neighbors. The
+next refill is allowed to include them again. Recently played tracks are
+excluded, up to 12 recommendations are queued at a time, and manually queued
+tracks always take priority. ReccoBeats requires no API key.
 
 Use `/autoplay enabled:false` or the panel button to disable it for a server.
 
