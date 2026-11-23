@@ -1,6 +1,10 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { config } from "../config.js";
+import {
+  AUTOPLAY_QUERY,
+  sanitizeRecommendationBuffer,
+} from "./reccobeats.js";
 import { debug, log, logError } from "../utils/logger.js";
 import {
   ARTIST_COOLDOWN,
@@ -110,6 +114,8 @@ export function collectSessions(client) {
       recentArtistIds: stationArtistIds(state.recentArtistIds),
       autoplaySeed: serializeTrack(state.autoplaySeed),
       autoplayCount: stationCount(state.autoplayCount),
+      autoplayBuffer: sanitizeRecommendationBuffer(state.autoplayBuffer),
+      autoplayQuery: AUTOPLAY_QUERY,
     };
   }
 
@@ -234,6 +240,10 @@ export function restoreStationFields(state, session) {
     .slice(-RECENT_URI_LIMIT);
   state.recentArtistIds = stationArtistIds(session?.recentArtistIds);
   state.autoplayCount = stationCount(session?.autoplayCount);
+  state.autoplayBuffer =
+    session?.autoplayQuery === AUTOPLAY_QUERY
+      ? sanitizeRecommendationBuffer(session?.autoplayBuffer)
+      : [];
 }
 
 function stationCount(value) {

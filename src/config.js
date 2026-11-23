@@ -20,6 +20,9 @@ export const config = {
     pcmHost: process.env.SPOTIFY_PCM_HOST || "127.0.0.1",
     pcmPort: Number(process.env.SPOTIFY_PCM_PORT || 8091),
   },
+  reccobeats: {
+    apiUrl: process.env.RECCOBEATS_API_URL || "https://api.reccobeats.com/v1",
+  },
   /** Persisted player sessions (JSON file). Docker sets DATA_PATH=/app/data/sessions.json. */
   dataPath:
     process.env.DATA_PATH || path.join(process.cwd(), "data", "sessions.json"),

@@ -7,6 +7,7 @@ import {
   collectSessions,
   restoreStationFields,
 } from "../src/services/sessionStore.js";
+import { AUTOPLAY_QUERY } from "../src/services/reccobeats.js";
 import { getPlayerState } from "../src/utils/playerState.js";
 
 function createTrack(title = "Song") {
@@ -82,6 +83,12 @@ test("collectSessions captures active guild players", () => {
   state.recentArtistIds = ["a".repeat(22), "b".repeat(22), "c".repeat(22), "d".repeat(22), "nope"];
   state.autoplaySeed = createTrack("Anchor");
   state.autoplayCount = 4;
+  state.autoplayBuffer = [{
+    spotifyId: "e".repeat(22),
+    title: "Recommended",
+    artist: "Other Artist",
+    popularity: 50,
+  }];
 
   const sessions = collectSessions(client);
   assert.ok(sessions["guild-1"]);
@@ -100,6 +107,8 @@ test("collectSessions captures active guild players", () => {
   ]);
   assert.equal(sessions["guild-1"].autoplaySeed.info.title, "Anchor");
   assert.equal(sessions["guild-1"].autoplayCount, 4);
+  assert.equal(sessions["guild-1"].autoplayQuery, AUTOPLAY_QUERY);
+  assert.equal(sessions["guild-1"].autoplayBuffer[0].title, "Recommended");
   assert.equal("panelMessageId" in sessions["guild-1"], false);
 });
 
@@ -110,6 +119,13 @@ test("restoreStationFields keeps a saved anchor and ignores older files", () => 
     recentTrackUris: ["spotify:track:abc123", "https://youtu.be/nope", "spotify:track:def456"],
     recentArtistIds: ["a".repeat(22), "nope", "b".repeat(22)],
     autoplayCount: 4,
+    autoplayQuery: AUTOPLAY_QUERY,
+    autoplayBuffer: [{
+      spotifyId: "e".repeat(22),
+      title: "Recommended",
+      artist: "Other Artist",
+      popularity: 50,
+    }],
   });
   assert.equal(state.autoplaySeed.info.uri, "spotify:track:abc123");
   assert.equal(state.autoplayCount, 4);
@@ -118,6 +134,7 @@ test("restoreStationFields keeps a saved anchor and ignores older files", () => 
     "spotify:track:def456",
   ]);
   assert.deepEqual(state.recentArtistIds, ["a".repeat(22), "b".repeat(22)]);
+  assert.equal(state.autoplayBuffer[0].title, "Recommended");
 
   const legacy = getPlayerState({}, "restore-legacy");
   restoreStationFields(legacy, { autoplay: true });
@@ -125,4 +142,5 @@ test("restoreStationFields keeps a saved anchor and ignores older files", () => 
   assert.deepEqual(legacy.recentTrackUris, []);
   assert.deepEqual(legacy.recentArtistIds, []);
   assert.equal(legacy.autoplayCount, 0);
+  assert.deepEqual(legacy.autoplayBuffer, []);
 });

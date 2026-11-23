@@ -36,6 +36,7 @@ services:
       DEBUG: ${DEBUG:-false}
       DATA_PATH: /app/data/sessions.json
       IDLE_LEAVE_MS: ${IDLE_LEAVE_MS:-300000}
+      RECCOBEATS_API_URL: ${RECCOBEATS_API_URL:-https://api.reccobeats.com/v1}
     volumes:
       - bot-data:/app/data
     networks:
