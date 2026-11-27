@@ -1,0 +1,14 @@
+---
+description: Personal Obsidian notes for this music bot live outside the repo
+alwaysApply: true
+---
+
+# Notas personales del bot
+
+Las notas de implementación de este bot están en el vault de Obsidian, no en el repo:
+
+`/home/viscount/Documents/Obsidian_Vault/Proyectos/discord-bot`
+
+Cuando pidan crearlas, actualizarlas o corregirlas, editar esos markdown. No duplicarlas en el README del repo salvo que lo pidan. El índice es `00 Índice.md`; el resto se enlaza desde ahí.
+
+Escribirlas en español, como notas personales del estado que funciona, con la fecha en el frontmatter `updated`.

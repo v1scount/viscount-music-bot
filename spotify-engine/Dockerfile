@@ -1,6 +1,13 @@
 FROM rust:1-bookworm AS build
 
 WORKDIR /src
+
+# IPv6 to index.crates.io (Fastly) fails from build containers, and Cargo's
+# HTTP/2 client then never gets past "Updating crates.io index".
+RUN echo 'precedence ::ffff:0:0/96 100' >> /etc/gai.conf
+ENV CARGO_HTTP_MULTIPLEXING=false \
+    CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
+
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 RUN cargo build --release --locked

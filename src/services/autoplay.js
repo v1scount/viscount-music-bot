@@ -102,6 +102,7 @@ export async function findAutoplayTrack(
       (result.targetPopularity === null
         ? ""
         : ` at popularity ${result.targetPopularity}±10`) +
+      (result.genre ? `, genre ${result.genre}` : "") +
       (result.excludedArtist ? " after excluding the seed artist" : ""),
   );
   return takeResolved(client, state, outcome, blockedUris);

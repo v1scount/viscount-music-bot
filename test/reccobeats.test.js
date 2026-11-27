@@ -134,15 +134,15 @@ test("client sends seed popularity and recent tracks to ReccoBeats", async () =>
     [`spotify:track:${SEED}`, `spotify:track:${RECENT}`],
   );
 
-  const request = urls[1];
-  assert.equal(request.pathname, "/v1/track/recommendation");
+  const request = urls.find((url) => url.pathname.endsWith("/track/recommendation"));
+  assert.ok(request);
   assert.equal(request.searchParams.get("seeds"), SEED);
   assert.equal(request.searchParams.get("negativeSeeds"), RECENT);
   assert.equal(request.searchParams.get("popularity"), "72");
   assert.equal(request.searchParams.get("size"), "50");
   assert.equal(result.targetPopularity, 72);
   assert.equal(result.excludedArtist, false);
-  assert.equal(urls.length, 2);
+  assert.equal(urls.filter((url) => url.hostname === "example.test").length, 2);
   assert.deepEqual(
     result.tracks.map((item) => item.spotifyId),
     [CLOSER, CLOSE],
@@ -186,8 +186,9 @@ test("a sticky recommendation excludes the seed artist on a second request", asy
   );
 
   assert.equal(result.excludedArtist, true);
-  assert.equal(urls.length, 3);
-  assert.equal(urls[2].searchParams.get("negativeSeeds"), `${SEED_ARTIST},${RECENT}`);
+  const reccobeatsUrls = urls.filter((url) => url.hostname === "example.test");
+  assert.equal(reccobeatsUrls.length, 3);
+  assert.equal(reccobeatsUrls[2].searchParams.get("negativeSeeds"), `${SEED_ARTIST},${RECENT}`);
   assert.deepEqual(
     result.tracks.map((item) => item.spotifyId),
     [CLOSE, CLOSER],

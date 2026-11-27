@@ -1,3 +1,4 @@
+import { filterSameGenre } from "./genre.js";
 import {
   RECOMMENDATION_SIZE,
   arrangeStation,
@@ -32,7 +33,7 @@ export class ReccoBeatsClient {
    */
   async recommendations(track, recentUris = []) {
     const seedId = spotifyTrackId(track);
-    if (!seedId) return { tracks: [], targetPopularity: null, excludedArtist: false };
+    if (!seedId) return { tracks: [], targetPopularity: null, excludedArtist: false, genre: null };
 
     const seed = await this.getJson(this.url("/track", { ids: seedId }));
     const seedTrack = (seed?.content ?? []).find((item) => spotifyTrackId(item) === seedId);
@@ -68,10 +69,16 @@ export class ReccoBeatsClient {
       }
     }
 
+    const seedMeta = {
+      artist: seedArtist?.name ?? "",
+      title: typeof seedTrack?.trackTitle === "string" ? seedTrack.trackTitle : "",
+    };
+    const tuned = await filterSameGenre(tracks, seedMeta, this.fetchImpl);
     return {
-      tracks: arrangeStation(tracks, seedArtist),
+      tracks: arrangeStation(tuned.tracks, seedArtist),
       targetPopularity,
       excludedArtist,
+      genre: tuned.genre,
     };
   }
 

@@ -1,7 +1,7 @@
 const SPOTIFY_TRACK_ID = /^[0-9A-Za-z]{22}$/;
 
 /** Bump this whenever the buffered recommendation policy changes. */
-export const AUTOPLAY_QUERY = "reccobeats-popularity-mix-v1";
+export const AUTOPLAY_QUERY = "reccobeats-genre-mix-v1";
 export const POPULARITY_WINDOW = 10;
 export const RECOMMENDATION_SIZE = 50;
 /** Other-artist tracks needed before the seed artist can stay in the buffer. */

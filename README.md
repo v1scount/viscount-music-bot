@@ -74,8 +74,12 @@ target. Results more than 10 popularity points away are discarded and the
 closest results are queued first. This keeps mainstream tracks with similarly
 popular tracks and niche tracks with similarly sized audiences; ReccoBeats does
 not expose raw reproduction counts, so Spotify popularity is the available
-proxy. Other artists lead the buffer, and the seed artist returns about once
-every four songs. If that first list is still mostly the seed artist, one
+proxy. Tracks outside the seed's genre are dropped before that mix, using the
+iTunes genre of each song. Hip-hop stays with R&B, and rock stays with
+alternative and metal; country, dancehall, or Bollywood do not fill a
+hip-hop station. Other artists then lead the buffer, and the seed artist
+returns about once every four songs. If that first list is still mostly
+the seed artist, one
 follow-up request excludes them so the station can fill with neighbors. The
 next refill is allowed to include them again. Recently played tracks are
 excluded, up to 12 recommendations are queued at a time, and manually queued
